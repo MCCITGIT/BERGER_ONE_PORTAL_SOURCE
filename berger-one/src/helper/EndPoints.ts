@@ -124,6 +124,8 @@ const ALL_ENDPOINTS = {
     GetShdList: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.ProtectonStock + 'GetShdList',
     GetSkuList: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.ProtectonStock + 'GetSkuList',
     GetActionCatList: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.ProtectonStock + 'GetActionCatList',
+    ActionDefaulterList: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.ProtectonStock + 'ActionDefaulterList',
+    GetActionRcList: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.ProtectonStock + 'GetActionRcList',
 
     // Protecton Invoice
     GetInvoiceDetails: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.ProtectonInvoice + 'GetInvoiceDetails',

@@ -2,28 +2,26 @@ import { useEffect, useState } from "react";
 import * as common from '../../../services/api/users/UserProfile';
 import * as Epca from '../../../services/api/protectonEpca/EpcaList';
 import * as stock from '../../../services/api/protectonTransact/TransactStock';
-import * as userProfile from '../../../services/api/users/UserProfile';
 import { UseAuthStore } from "../../../services/store/AuthStore";
 import { CiSearch } from "react-icons/ci";
 import Select from 'react-select';
+import AnimateHeight from "react-animate-height";
 
-const TransactDefaulterList = () => {
+const TransactReturnCheque = () => {
 
     const [loading, setLoading] = useState(false);
+    const [openOrg, setOpenOrg] = useState<string | null>(null);
     const [data, setData] = useState<any>({
         regionList: [],
         depotList: [],
         terrList: [],
         customerList: [],
-        defaulterSlabList: [],
         selectedRegion: '',
         selectedDepot: '',
         selectedTerr: '',
         selectedCustomer: '',
-        selectedDefaulterSlab: 1,
-        valueInPage: 7,
-        defaulterList: [],
-        asOn: '',
+        valueInPage: 1,
+        returnChequeList: [],
     });
 
     const user = UseAuthStore((state: any) => state.userDetails);
@@ -72,6 +70,7 @@ const TransactDefaulterList = () => {
 
     const GetTerr = async (region: string) => {
         setLoading(true);
+
         const payload: any = {
             region: region,
             app_id: '15',
@@ -106,40 +105,30 @@ const TransactDefaulterList = () => {
         setLoading(false);
     }
 
-    const GetDefaulterSlab = async () => {
-        setLoading(true);
-        const payload: any = {
-            lov_type: "PT_DEFAULTER_SLAB",
-            active: 'Y'
-        };
-        try {
-            const response: any = await userProfile.CommonLovDetails(payload);
-            setData((prevData: any) => ({
-                ...prevData,
-                defaulterSlabList: response.data.table || [],
-            }));
-        } catch (error) {
-            return;
-        }
-        setLoading(false);
-    }
-
-    const GetdefaulterList = async () => {
+    const GetReturnChequeList = async () => {
         setLoading(true);
         const payload: any = {
             region: data.selectedRegion,
             depot_code: data.selectedDepot,
             terr_code: data.selectedTerr,
             cat: data.selectedCustomer,
-            slab: data.selectedDefaulterSlab,
-            top: data.valueInPage,
+            days: data.valueInPage,
         };
         try {
-            const response: any = await stock.ActionDefaulterList(payload);
+            const response: any = await stock.GetActionRcList(payload);
+            const flatList: any[] = response.data.table || [];
+            const groupedByOrg = flatList.reduce((acc, item) => {
+                const key = item.org;
+                if (!acc[key]) {
+                    acc[key] = [];
+                }
+                acc[key].push(item);
+                return acc;
+            }, {} as Record<string, any[]>);
+
             setData((prevData: any) => ({
                 ...prevData,
-                defaulterList: response.data.table || [],
-                asOn: response.data.table[0].asOn || '',
+                returnChequeList: groupedByOrg,
             }));
         } catch (error) {
             return;
@@ -149,18 +138,16 @@ const TransactDefaulterList = () => {
 
     useEffect(() => {
         GetRegion();
-        GetCustomer();
-        GetDefaulterSlab();
-        GetdefaulterList();
+        GetCustomer()
     }, []);
 
     return (
         <>
             <div className="page-titlebar flex items-center justify-between bg-white px-4 py-1">
-                <h5 className="text-lg font-semibold dark:text-white-light">Transact Defaulter List</h5>
+                <h5 className="text-lg font-semibold dark:text-white-light">Transact Return Cheque</h5>
             </div>
 
-            <div className="bg-white rounded-lg px-4 py-2 shadow-md">
+            <div className="bg-white rounded-lg px-4 py-2 shadow-md mb-4">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
 
                     <div>
@@ -255,28 +242,6 @@ const TransactDefaulterList = () => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-semibold mb-1">Defaulter Slab:</label>
-                        <Select
-                            className="text-sm"
-                            isSearchable={true}
-                            options={[
-                                ...data.defaulterSlabList.map((d: any) => ({
-                                    value: d.lov_code,
-                                    label: d.lov_value,
-                                })),
-                            ]}
-                            value={
-                                data.selectedDefaulterSlab
-                                    ? { value: data.selectedDefaulterSlab, label: data.defaulterSlabList.find((d: any) => d.lov_code === data.selectedDefaulterSlab)?.lov_value }
-                                    : null
-                            }
-                            onChange={(event) => {
-                                setData((pre: any) => ({ ...pre, selectedDefaulterSlab: event?.value }))
-                            }}
-                        />
-                    </div>
-
-                    <div>
                         <label className="block text-sm font-semibold mb-1">Value in Page:</label>
                         <input
                             type="number"
@@ -306,7 +271,7 @@ const TransactDefaulterList = () => {
                             className="bg-blue-500 text-white px-4 py-2 space-x-2 rounded hover:bg-blue-600 text-sm flex items-center"
                             onClick={(e) => {
                                 e.preventDefault();
-                                GetdefaulterList();
+                                GetReturnChequeList();
                             }}>
                             <CiSearch /> <span>Search</span>
                         </button>
@@ -314,57 +279,52 @@ const TransactDefaulterList = () => {
                 </div>
             </div>
 
-            {data.asOn && (
-                <div className="flex justify-center items-center">
-                    <div className="w-1/4 bg-white shadow-md px-1 py-1 mb-2 flex items-center justify-center rounded-b-3xl rounded-t-none font-semibold">
-                        <span className="text-xs mr-1">Last Update As On:</span>
-                        <span className="text-xs text-blue-600">{data.asOn}</span>
-                    </div>
-                </div>
-            )}
 
-            {data.defaulterList.length > 0 && (
-                <div>
-                    {data.defaulterList.map((item: any, idx: any) => (
-                        <div key={idx} className="w-full pt-2">
-                            <div className="w-full border rounded-md shadow-sm bg-white text-sm">
-                                <div className="flex items-center justify-between px-4 py-1.5 border-b">
-
-                                    {/* LEFT: 7/12 of the parent width */}
-                                    <div className="w-7/12 flex items-center gap-4">
-                                        <span className="font-medium text-gray-800 truncate">
-                                            {item.dealer}
-                                        </span>
-                                        <span className="text-[11px] text-slate-800 bg-blue-100 px-2 py-[1px] rounded-full whitespace-nowrap">
-                                            Customer Type:&nbsp;
-                                            <span className="font-medium">{item.cat_cust_desc}</span>
-                                        </span>
-                                    </div>
-
-                                    {/* MIDDLE: 3/12 of the parent width */}
-                                    <div className="w-3/12 flex flex-col items-start text-gray-700 text-xs">
-                                        <span className="font-medium text-sm truncate">
-                                            {item.terr_name}
-                                        </span>
-                                        <span className="text-gray-500 truncate">
-                                            {item.regn} | {item.org}
-                                        </span>
-                                    </div>
-
-                                    {/* RIGHT: 2/12 of the parent width, contents aligned to end */}
-                                    <div className="w-2/12 flex justify-end">
-                                        <div className="bg-blue-700 text-white rounded min-w-20 px-3 py-1 text-center leading-tight" style={{ backgroundColor: item.color_code }}>
-                                            <div className="text-[9px]">{item.slab_value}</div>
-                                            <div className="text-lg font-bold">{item.gross_os}</div>
+            {Object.keys(data.returnChequeList).length > 0 && (
+                            <div className="space-y-2">
+                                {Object.keys(data.returnChequeList).map((org) => {
+                                    const groupItems = data.returnChequeList[org];
+                                    return (
+                                        <div key={org} className="rounded border border-[#d3d3d3]">
+                                            <button
+                                                type="button"
+                                                className="custAccoHead flex w-full items-center px-3 py-2 text-white-dark"
+                                                onClick={() => setOpenOrg(openOrg === org ? null : org)}
+                                            >
+                                                <span>{org} ({groupItems.length})</span>
+                                                <div className={`ltr:ml-auto rtl:mr-auto ${openOrg === org ? 'rotate-180' : ''}`}>
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                        xmlns="http://www.w3.org/2000/svg">
+                                                        <path d="M19 9L12 15L5 9" stroke="currentColor" strokeWidth="1.5"
+                                                            strokeLinecap="round" strokeLinejoin="round"></path>
+                                                    </svg>
+                                                </div>
+                                            </button>
+                                            <AnimateHeight duration={300} height={openOrg === org ? "auto" : 0}>
+                                                <div className="p-2">
+                                                    <div className="grid grid-cols-4 gap-4 font-semibold border-b pb-1 mb-1">
+                                                        <span>DEALER</span>
+                                                        <span className="text-center">PD DT.</span>
+                                                        <span className="text-center">AMT</span>
+                                                        <span className="text-center">STATUS</span>
+                                                    </div>
+                                                    <ul>
+                                                        {groupItems.map((item: any, index: number) => (
+                                                            <li key={index} className="grid grid-cols-4 gap-4 py-1">
+                                                                <span>{item.dealer}</span>
+                                                                <span className="text-center">{item.rcpt_date}</span>
+                                                                <span className="text-center">{item.rcpt_amount}</span>
+                                                                <span className="text-center">{item.rcpt_reversal_reason}</span>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            </AnimateHeight>
                                         </div>
-                                    </div>
-
-                                </div>
+                                    );
+                                })}
                             </div>
-                        </div>
-                    ))}
-                </div>
-            )}
+                        )}
 
             {loading && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-white bg-opacity-75">
@@ -382,6 +342,6 @@ const TransactDefaulterList = () => {
             )}
         </>
     );
-};
+}
 
-export default TransactDefaulterList;
+export default TransactReturnCheque;
