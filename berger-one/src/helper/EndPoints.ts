@@ -14,6 +14,9 @@ const BASE_ENDPOINTS = {
     ProtectonStock: 'PROTECTON/Stock/',
     ProtectonInvoice: 'PROTECTON/Invoice/',
     ProtectonPaymentReceipt: 'PROTECTON/PaymentReceipt/',
+    ProtectonOS: 'PROTECTON/OS/',
+    ProtectonBilling: 'PROTECTON/Billing/',
+    ProtectonPotentialLead: 'PROTECTON/PotentialLead/',
     TransactOS: 'PROTECTON/OS/'
 };
 
@@ -109,6 +112,7 @@ const ALL_ENDPOINTS = {
     LegalCaseApprovalAsmReport: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.Report + 'GetLegalCaseApprovalAsmReport',
     GetProjectList: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.Epca + 'GetProjectList',
     GetCalculatedGC: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.Epca + 'GetCalculatedGC',
+    GetUserApplicableDealer: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.Epca + 'GetUserApplicableDealer',
 
     // Protecton DSR
     UserApplDlrSales: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.ProtectonDsr + 'UserApplDlrSales',
@@ -133,6 +137,8 @@ const ALL_ENDPOINTS = {
     GetShdList: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.ProtectonStock + 'GetShdList',
     GetSkuList: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.ProtectonStock + 'GetSkuList',
     GetActionCatList: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.ProtectonStock + 'GetActionCatList',
+    ActionDefaulterList: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.ProtectonStock + 'ActionDefaulterList',
+    GetActionRcList: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.ProtectonStock + 'GetActionRcList',
 
     // Protecton Invoice
     GetInvoiceDetails: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.ProtectonInvoice + 'GetInvoiceDetails',
@@ -141,7 +147,17 @@ const ALL_ENDPOINTS = {
     GetPRList: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.ProtectonPaymentReceipt + 'GetPRList',
 
     // Transact OS
-    ODbyDateList: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.TransactOS + 'ODbyDateList',
+    ODbyDateList: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.ProtectonOS + 'ODbyDateList',
+
+    // Transact Billing
+    GetBillingList: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.ProtectonBilling + 'GetBillingList',
+    GetBillingDetails: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.ProtectonBilling + 'GetBillingDetails',
+    GetBillingTLVBalance: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.ProtectonBilling + 'GetBillingTLVBalance',
+    InsertBillingSKU: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.ProtectonBilling + 'InsertBillingSKU',
+
+    // Transact Potential Lead
+    PCADtlsBillto: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.ProtectonPotentialLead + 'PCADtlsBillto',
+    GetPCASkuBillingDetails: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.ProtectonPotentialLead + 'GetPCASkuBillingDetails',
 
     //#endregion
 };
