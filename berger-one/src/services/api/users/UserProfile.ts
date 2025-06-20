@@ -51,6 +51,6 @@ export function GetTerrDepotWise<P, G>(data: { depot_code: any }): Promise<G> {
     return HTTP_POST<P, G>(data, ENDPOINTS.GetTerrDepotWise) as Promise<G>;
 }
 
-export function UserProfileInsert<P, G>(data): Promise<G> {
+export function UserProfileInsert<P, G>(data: any): Promise<G> {
     return HTTP_POST<P, G>(data, ENDPOINTS.UserProfileInsert) as Promise<G>;
 }

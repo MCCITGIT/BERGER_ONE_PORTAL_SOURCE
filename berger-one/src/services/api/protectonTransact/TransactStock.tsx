@@ -16,3 +16,11 @@ export function GetSkuList<P, G>(data: any): Promise<G> {
 export function GetActionCatList<P, G>(data: any): Promise<G> {
     return HTTP_POST<P, G>(data, ENDPOINTS.GetActionCatList) as Promise<G>;
 }
+
+export function ActionDefaulterList<P, G>(data: any): Promise<G> {
+    return HTTP_POST<P, G>(data, ENDPOINTS.ActionDefaulterList) as Promise<G>;
+}
+
+export function GetActionRcList<P, G>(data: any): Promise<G> {
+    return HTTP_POST<P, G>(data, ENDPOINTS.GetActionRcList) as Promise<G>;
+}

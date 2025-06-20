@@ -1,7 +1,4 @@
-// import { HTTP_POST, HTTP_GET } from '@/src/helper/ApiCall';
-// import { ENDPOINTS } from '@/src/helper/EndPoints';
-
-import { HTTP_POST } from "../../../helper/ApiCall";
+import { HTTP_GET, HTTP_POST } from "../../../helper/ApiCall";
 import { ENDPOINTS } from "../../../helper/EndPoints";
 
 export function GetPcaList<P, G>(data: any): Promise<G> {
@@ -44,4 +41,12 @@ export function GetTlvRevisionList<P, G>(data: any): Promise<G> {
 
 export function GetEpcaGpGcRateDtls<P, G>(data: any): Promise<G> {
     return HTTP_POST<P, G>(data, ENDPOINTS.GetEpcaGpGcRateDtls) as Promise<G>;
+}
+
+export function GetUserApplicableDealer<P, G>(data: any): Promise<G> {
+    return HTTP_GET<P, G>(data, ENDPOINTS.GetUserApplicableDealer) as Promise<G>;
+}
+
+export function GetProjectList<P, G>(data: any): Promise<G> {
+    return HTTP_POST<P, G>(data, ENDPOINTS.GetProjectList) as Promise<G>;
 }
