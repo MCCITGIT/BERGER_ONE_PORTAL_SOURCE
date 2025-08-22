@@ -23,7 +23,6 @@ export const BASE_ENDPOINTS = {
     ProtectonReport: 'PROTECTON/Report/',
 };
 
-
 const ALL_ENDPOINTS = {
     //#region SOUMYA SHUBHRA ROY AND SUBHRAJIT MUKHERJEE
     // ========### Login Module ###========

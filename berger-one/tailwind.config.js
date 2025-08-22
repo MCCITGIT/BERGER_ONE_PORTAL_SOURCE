@@ -8,6 +8,7 @@ export default {
     extend: {},
   },
   plugins: [
-    require('@tailwindcss/forms'),
+    // Temporarily removed @tailwindcss/forms due to CommonJS/ES module conflict
+    // require('@tailwindcss/forms'),
   ],
-}; 
+};
