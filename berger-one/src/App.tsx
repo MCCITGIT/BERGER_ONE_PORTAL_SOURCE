@@ -84,23 +84,23 @@ function App() {
             element: <Dashboard />,
           },
           {
-            path: '/admin/FromMenuMaster/',
+            path: "/admin/FromMenuMaster",
             element: <FromMenuMaster />,
           },
           {
-            path: '/admin/UserFormAccess/',
+            path: '/admin/UserFormAccess',
             element: <UserFormAccess />,
           },
           {
-            path: '/admin/user-profile/UserProfile/',
+            path: '/admin/user-profile/UserProfile',
             element: <UserProfile />,
           },
           {
-            path: '/admin/users/userListView/',
+            path: '/admin/users/userListView',
             element: <UserListViewNew />,
           },
           {
-            path: '/admin/PasswordHelper/',
+            path: '/admin/PasswordHelper',
             element: <PasswordHelper />,
           },
           {
@@ -312,11 +312,11 @@ function App() {
       <Routes>
         <Route path="/" element={<FixedLayout />}>
           <Route index element={<Dashboard />} />
-          <Route path="/admin/FromMenuMaster/" element={<FromMenuMaster />} />
-          <Route path="/admin/UserFormAccess/" element={<UserFormAccess />} />
-          <Route path="/admin/user-profile/UserProfile/" element={<UserProfile />} />
-          <Route path="/admin/users/userListView/" element={<UserListViewNew />} />
-          <Route path="/admin/PasswordHelper/" element={<PasswordHelper />} />
+          <Route path="/admin/FromMenuMaster" element={<FromMenuMaster />} />
+          <Route path="/admin/UserFormAccess" element={<UserFormAccess />} />
+          <Route path="/admin/user-profile/UserProfile" element={<UserProfile />} />
+          <Route path="/admin/users/userListView" element={<UserListViewNew />} />
+          <Route path="/admin/PasswordHelper" element={<PasswordHelper />} />
           <Route path="/Protecton/ePCA/EPCAList" element={<EPCAList />} />
           <Route path="/Protecton/ePCA/EPCADetails" element={<EPCADetails />} />
           <Route path="/Protecton/ePCA/EPCADepotApprovalList" element={<EPCADepotApprovalList />} />

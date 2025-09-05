@@ -14,6 +14,7 @@ const FixedLayout = () => {
 
     const dropdownRef = useRef<HTMLDivElement>(null);
     const menuDropdownRef = useRef<HTMLLIElement>(null);
+    const subMenuDropdownRef = useRef<HTMLUListElement>(null);
 
     const user = UseAuthStore((state: any) => state.userDetails);
     const { logout }: any = UseAuthStore();
@@ -45,11 +46,9 @@ const FixedLayout = () => {
         storage.setItem(key, JSON.stringify(value));
     };
 
-    const test = (route: string) => {
-        // console.log("route", route);
+    const test = () => {
         setValueInSeasonStorage('listRoute', 'Menu');
         setValueInSeasonStorage('leadListRoute', 'Menu');
-        navigate(route);
     };
 
     const childHideFunc = (item: any, id: any) => {
@@ -59,8 +58,8 @@ const FixedLayout = () => {
                 return { ...uam, childVisibility: !uam.childVisibility };
             } else {
                 // Close all other items at the same level
-                return { 
-                    ...uam, 
+                return {
+                    ...uam,
                     childVisibility: false,
                     children: uam.children ? childHideFunc(uam.children, id) : []
                 };
@@ -79,10 +78,11 @@ const FixedLayout = () => {
             >
                 <button
                     className="w-full flex items-center justify-between gap-2 px-3 py-2 text-sm text-left text-gray-800 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700 rounded-md"
-                    onClick={() => {
-                        // console.log(item)
-                        test(item.form_link);
-                        
+                    onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        navigate(item.form_link);
+                        test();
                         // If item has no children, close the entire dropdown
                         if (!item.children || item.children.length === 0) {
                             setOpenMenuDropdown(null);
@@ -99,14 +99,15 @@ const FixedLayout = () => {
                     {item.children && item.children.length > 0 && <FaAngleDown />}
                 </button>
 
-                {item.children && item.childVisibility && (
-                    <ul className="ml-3 mt-1 space-y-1">
+                {item.children.length > 0 && item.childVisibility && (
+                    <ul ref={subMenuDropdownRef} className="ml-3 mt-1 space-y-1">
                         {multiLevelDropdown(item.children)}
                     </ul>
                 )}
             </li>
         ));
     };
+
 
     useEffect(() => {
         const menuRec = (uam: any) => {
@@ -129,7 +130,8 @@ const FixedLayout = () => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
                 setShowDropdown(false);
             }
-            if (menuDropdownRef.current && !menuDropdownRef.current.contains(event.target as Node)) {
+            if (menuDropdownRef.current && !menuDropdownRef.current.contains(event.target as Node) && 
+                subMenuDropdownRef.current && !subMenuDropdownRef.current.contains(event.target as Node)) {
                 setOpenMenuDropdown(null);
             }
         };
@@ -191,11 +193,11 @@ const FixedLayout = () => {
                     {/* horizontal menu */}
                     <ul className="horizontal-menu border-t border-[#ebedf2] bg-white px-6 py-0 font-semibold text-black rtl:space-x-reverse dark:border-[#191e3a] dark:bg-black dark:text-white-dark flex flex-wrap gap-4">
                         {userApplicableMenu.map((item: any, index: number) => (
-                            <li className="relative" key={index} ref={menuDropdownRef}>
+                            <li className="relative" key={index} ref={menuDropdownRef} >
                                 <div className="flex items-center cursor-pointer">
                                     {item.form_link === '#' ? (
                                         <div
-                                            onClick={() => handleMenuDropdownToggle(index)}
+                                            onClick={() => { handleMenuDropdownToggle(index); }}
                                             className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md"
                                         >
                                             <CiViewList />
@@ -203,22 +205,24 @@ const FixedLayout = () => {
                                             {item.children && item.children.length > 0 && <FaAngleDown />}
                                         </div>
                                     ) : (
-                                        <Link
-                                            to={item?.form_link || "#"}
+                                        <div
+                                            onClick={() => { navigate(item?.form_link || "#") }}
                                             className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md"
                                         >
                                             <CiViewList />
                                             <span>{item.form_name}</span>
                                             {item.children && item.children.length > 0 && <FaAngleDown />}
-                                        </Link>
+                                        </div>
                                     )}
                                 </div>
 
-                                {item.children && item.children.length > 0 && openMenuDropdown === index && (
-                                    <ul className="absolute left-0 mt-2 w-[300px] rounded-md bg-white p-2 shadow-lg dark:bg-[#1f2937] space-y-1 z-50">
-                                        {multiLevelDropdown(item.children)}
-                                    </ul>
-                                )}
+                                {
+                                    item.children && item.children.length > 0 && openMenuDropdown === index && (
+                                        <ul className="absolute left-0 mt-2 w-[300px] rounded-md bg-white p-2 shadow-lg dark:bg-[#1f2937] space-y-1 z-50">
+                                            {multiLevelDropdown(item.children)}
+                                        </ul>
+                                    )
+                                }
                             </li>
                         ))}
                     </ul>
@@ -227,8 +231,8 @@ const FixedLayout = () => {
                         <Outlet />
                     </div>
                 </div>
-            </header>
-        </div>
+            </header >
+        </div >
     )
 }
 

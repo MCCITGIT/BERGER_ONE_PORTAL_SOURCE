@@ -7,12 +7,101 @@ import * as common from '../../services/api/users/UserProfile';
 import Select from 'react-select';
 import addButton from '../../assets/images/add-button.svg'
 import { Modal } from '@mantine/core';
+import { FaPlus } from "react-icons/fa6";
+import { GetVerticalWisBusinessLine } from '../../services/api/protectonLead/PotentialLead';
+import CustomPopupComponent from '../protecton/Lead/Components/customPopupComponent';
 
 const Dashboard = () => {
-
+    const [popupOpenData, setPopupOpenData] = useState({ open: false, popupHeader: '' });
     const [isMWALoading, setIsMWALoading] = useState(false);
     const [isOverduesLoading, setIsOverduesLoading] = useState(false);
     const [selectedMWAOption, setSelectedMWAOption] = useState('self');
+    // for lead popup //
+    const [showDropdown, setShowDropdown] = useState(false);
+    const [loading, setLoading] = useState(false);
+    // for lead popup //
+    const dataObj = {
+        // for PROLINKS popup
+        regionList: [],
+        applicableDepotList: [],
+        stateList: [],
+        paint_admixture_List: [],
+        ac_type_List: [],
+        govt_pvt_List: [],
+        painting_List: [],
+        lead_sector_List: [],
+        lead_sub_sector_List: [],
+        lead_potential_list: [],
+        key_appl_city_List: [],
+        key_lead_stage_List: [],
+        key_painting_start_time_List: [],
+        selectedRegionList: '',
+        selectedApplicableDepotList: '',
+        selectedStateList: '',
+        selectedPaint_admixture: '',
+        selectedAc_type: '',
+        selectedGovt_pvt: '',
+        selectedPainting: '',
+        selectedLead_sector: '',
+        selectedLead_sub_sector: '',
+        selectedLead_potential: '',
+        // selectedKey_appl_city: '', //
+        selectedKey_lead_stage: '',
+        selectedKey_painting_start_time: '',
+        projectName: '', // Project Information
+        projectDescription: '', // Project Information
+        siteLocation: '', // Project Information
+        addr1: '', // Project Information
+        addr2: '', // Project Information
+        city: '', // Project Information
+        pinCode: '', // Project Information
+        state: '', // Project Information
+        pan_no: '',
+        gstin_no: '',
+        intPaintableArea: '',
+        extPaintableArea: '',
+        painting_remarks: '',
+        leadStatus: 'NEW',
+        tentativeStartDate: '',
+        durationInMonth: '',
+        paint_business_potential: '',
+        businessPotential_cc: '',
+        shareOfBusiness: '',
+        siteContactTableData: [],
+        // for SELF popup
+        ptm_ref_lead_yn: '', // Referral Lead
+        ptm_ref_lead_type: '', // Refer From
+        ptm_ref_dealer_code: '', // Existing Business Contract
+        potentialTrackingcontacts: [], // Referral Source Details
+        potentialTrackingDocs: [], // Upload Documents
+        ptm_customer_name: '', // Customer
+        ptm_contractor_type: '', // Contractor Type
+        ptm_potential_val: '', // Value of paints
+        ptm_potential_vol: '', // Scope of paints
+        ptm_potential_area: '', // Scope for paints area
+        ptm_potential_area_uom: '', // Scope for paints area uom
+        ptm_area: '', // service area
+        ptm_business_type: '', // Business Type
+        ptm_product_category: [], // Product Category
+        ptm_industry_segment: '', // Industry Segment
+        ptm_lead_share: '', // Lead Share
+        ptm_region: '', // region
+        ptm_depot_code: '', // depot
+        ptm_terr_code: '', // terr
+        ptm_work_status: '', // Work In Progress
+        ptm_extra_info: '', // Work In Progress
+        referralLead: [{ value: 'Y', label: "YES" }, { value: 'N', label: 'NO' }], // Referral Lead DDL
+        refer_from_List: [], // Refer From DDL
+        contractor_type_List: [],// Contractor Type DDL
+        potential_area_uom_List: [], // Scope for paints area uom DDL
+        business_type_List: [], // Business Type DDL
+        product_category_List: [], // Product Category
+        industry_segment_List: [], // Industry Segment
+        lead_share_List: [], // Lead Share
+        doc_type_List: [], // Upload Documents doc_type
+    }
+
+    const [leadData, setleadData] = useState<any>({ ...dataObj });
     const [data, setData] = useState<any>({
         dashboardLeadFunnelData: {},
         dashboardSaleReviewData: {},
@@ -24,13 +113,41 @@ const Dashboard = () => {
         selectedUserGroup: '',
         applicableUserList: [],
         selectedApplicableUser: '',
-        leadData: [],
+        leadData: []
     });
 
     const user = UseAuthStore((state: any) => state.userDetails);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalTitle, setModalTitle] = useState('');
+    // for lead popup //
+    const [filterdata, setFilterData] = useState<any>({
+        verticalData: [],
+        protecton_regionList: [],
+        depotList: [],
+        terrList: [],
+        assignStatusList: [],
+        workStatusList: [],
+    });
+
+    // for lead popup //
+    const VerticalWisBusinessLineAPICall = async () => {
+        // setLoading(true);
+        const data: any = {
+            app_id: '15'
+        };
+        try {
+            const response: any = await GetVerticalWisBusinessLine(data);
+            setFilterData((prevData: any) => ({
+                ...prevData,
+                verticalData: response.data.table || [],
+            }));
+
+        } catch (error) {
+            return;
+        }
+        // setLoading(false);
+    }
 
     const GetDashboardLeadFunnel = async () => {
         try {
@@ -126,6 +243,183 @@ const Dashboard = () => {
         }
     }
 
+
+    // for lead popup //
+    const Getdepot = async (region: string) => {
+        setLoading(true);
+        const payload: any = {
+            app_id: '15',
+            region: region,
+            terr_code: '',
+            user_appl_yn: 'Y',
+        };
+        try {
+            const response: any = await common.GetProtectonApplicableDepot(payload);
+            setFilterData((prevData: any) => ({
+                ...prevData,
+                depotList: response.data.table || []
+            }));
+        } catch (error) {
+            return;
+        }
+        setLoading(false);
+    }
+
+    const Getterr = async (props: any) => {
+        setLoading(true);
+        const payload: any = {
+            // user_group: user.group_code,
+            app_id: '15',
+            region: props?.region,
+            depot_code: props?.depot,
+            user_appl_yn: 'Y',
+        };
+        try {
+            const response: any = await common.GetProtectonApplicableTerr(payload);
+            setFilterData((prevData: any) => ({
+                ...prevData,
+                terrList: response?.data?.table || []
+            }));
+        } catch (error) {
+            return;
+        }
+        setLoading(false);
+    }
+
+    const OtherAPIcall = async (payload: any) => {
+        setLoading(true);
+        try {
+            const response: any = await common.CommonLovDetails(payload);
+            if (payload.lov_type === "PT_ASSIGN_STATUS") {
+                setFilterData((prevData: any) => ({
+                    ...prevData,
+                    assignStatusList: response.data.table || []
+                }));
+            }
+            else if (payload.lov_type === "PT_WORK_IN_PROGRESS") {
+                setFilterData((prevData: any) => ({
+                    ...prevData,
+                    workStatusList: response.data.table || []
+                }));
+            }
+            // -----------PROLINKS popup-----------
+            else if (payload.lov_type === "PT_LEAD_CATEGORY") {
+                setData((prevData: any) => ({
+                    ...prevData,
+                    paint_admixture_List: response.data.table || []
+                }));
+            }
+            else if (payload.lov_type === "LEAD_ACCOUNT_TYPE") {
+                setData((prevData: any) => ({
+                    ...prevData,
+                    ac_type_List: response.data.table || []
+                }));
+            }
+            else if (payload.lov_type === "PT_GOVT_PVT") {
+                setData((prevData: any) => ({
+                    ...prevData,
+                    govt_pvt_List: response.data.table || []
+                }));
+            }
+            else if (payload.lov_type === "PT_PAINTING") {
+                setData((prevData: any) => ({
+                    ...prevData,
+                    painting_List: response.data.table || []
+                }));
+            }
+            else if (payload.lov_type === "PT_LEAD_SECTOR") {
+                setData((prevData: any) => ({
+                    ...prevData,
+                    lead_sector_List: response.data.table || []
+                }));
+            }
+            else if (payload.lov_type === "PT_LEAD_SUB_SECTOR") {
+                setData((prevData: any) => ({
+                    ...prevData,
+                    lead_sub_sector_List: response.data.table || []
+                }));
+            }
+            else if (payload.lov_type === "LEAD_POTENTIAL") {
+                setData((prevData: any) => ({
+                    ...prevData,
+                    lead_potential_list: response.data.table || []
+                }));
+            }
+            else if (payload.lov_type === "KEY_APPL_CITY") {
+                setData((prevData: any) => ({
+                    ...prevData,
+                    key_appl_city_List: response.data.table || []
+                }));
+            }
+            else if (payload.lov_type === "PT_KEY_LEAD_STAGE") {
+                setData((prevData: any) => ({
+                    ...prevData,
+                    key_lead_stage_List: response.data.table || []
+                }));
+            }
+            else if (payload.lov_type === "PT_KEY_PAINTING_START_TIME") {
+                setData((prevData: any) => ({
+                    ...prevData,
+                    key_painting_start_time_List: response.data.table || []
+                }));
+            }
+            // -----------SELF popup-----------
+            else if (payload.lov_type === "PT_BUSINESS_CONTACT") {
+                setData((prevData: any) => ({
+                    ...prevData,
+                    refer_from_List: response.data.table || []
+                }));
+            }
+            else if (payload.lov_type === "PT_CONTRACTOR_TYPE") {
+                setData((prevData: any) => ({
+                    ...prevData,
+                    contractor_type_List: response.data.table || []
+                }));
+            }
+            else if (payload.lov_type === "PT_AREA_MOU") {
+                setData((prevData: any) => ({
+                    ...prevData,
+                    potential_area_uom_List: response.data.table || []
+                }));
+            }
+            else if (payload.lov_type === "PT_BUSINESS_TYPE") {
+                setData((prevData: any) => ({
+                    ...prevData,
+                    business_type_List: response.data.table || []
+                }));
+            }
+            else if (payload.lov_type === "PT_PRODUCT_CATEGORY") {
+                setData((prevData: any) => ({
+                    ...prevData,
+                    product_category_List: response.data.table || []
+                }));
+            }
+            else if (payload.lov_type === "PT_INDUSTRY_SEGMENT") {
+                setData((prevData: any) => ({
+                    ...prevData,
+                    industry_segment_List: response.data.table || []
+                }));
+            }
+            else if (payload.lov_type === "PT_LEAD_SHARE") {
+                setData((prevData: any) => ({
+                    ...prevData,
+                    lead_share_List: response.data.table || []
+                }));
+            }
+            else if (payload.lov_type === "PT_DOC_TYPE") {
+                setData((prevData: any) => ({
+                    ...prevData,
+                    doc_type_List: response.data.table || []
+                }));
+            }
+        } catch (error) {
+            return;
+        }
+        setLoading(false);
+    }
+    // for lead popup //
+
+
     const GetUserGroup = async () => {
         // Only proceed if user exists (client-side)
         if (!user || !user.group_code) return;
@@ -188,6 +482,12 @@ const Dashboard = () => {
         setIsModalOpen(true);
     };
 
+    // for lead popup //
+    const handleDropdownSelect = (action: string) => {
+        setShowDropdown(false);
+        setPopupOpenData({ open: true, popupHeader: action })
+    };
+
     const closeModal = () => {
         setIsModalOpen(false);
     };
@@ -196,6 +496,7 @@ const Dashboard = () => {
         GetDashboardLeadFunnel();
         GetDashboardSales();
         GetDashboardLeadData();
+        VerticalWisBusinessLineAPICall();
 
         // Only call user-dependent functions if user exists (client-side)
         if (user && user.user_id) {
@@ -210,6 +511,7 @@ const Dashboard = () => {
             GetApplicableUserList();
         }
     }, [data.selectedUserGroup, data.selectedRegion]);
+
     return (
         <>
             <div className="page-titlebar flex items-center justify-between bg-white px-4 py-2">
@@ -239,14 +541,14 @@ const Dashboard = () => {
                         </div>
 
                         <div className="flex flex-col items-center space-y-2">
-                            <div className="w-9/12 font-semibold text-white bg-gradient-to-r from-purple-600 to-pink-600 p-2 text-center rounded-full">Scope: {data.dashboardLeadFunnelData.val_total}</div>
-                            <div className="w-7/12 font-semibold text-white bg-gradient-to-r from-amber-700 to-amber-600 p-2 text-center rounded-full">Estimation: {data.dashboardLeadFunnelData.val_negotiation}</div>
-                            <div className="w-5/12 font-semibold text-white bg-gradient-to-r from-red-700 to-red-500 p-2 text-center rounded-t-full">Negotiation: {data.dashboardLeadFunnelData.val_estimation}</div>
+                            <div className="w-9/12 font-semibold text-white bg-gradient-to-r from-purple-600 to-pink-600 p-2 text-center rounded-full">Scope: {data?.dashboardLeadFunnelData?.val_total}</div>
+                            <div className="w-7/12 font-semibold text-white bg-gradient-to-r from-amber-700 to-amber-600 p-2 text-center rounded-full">Estimation: {data?.dashboardLeadFunnelData?.val_negotiation}</div>
+                            <div className="w-5/12 font-semibold text-white bg-gradient-to-r from-red-700 to-red-500 p-2 text-center rounded-t-full">Negotiation: {data?.dashboardLeadFunnelData?.val_estimation}</div>
                             <div className="w-7/12 flex justify-between">
-                                <div className="text-red-800 font-semibold">{data.dashboardLeadFunnelData.val_order_lost} Order Lost</div>
-                                <div className="text-red-800 font-semibold">Lead Value Lost {data.dashboardLeadFunnelData.val_lead_lost}</div>
+                                <div className="text-red-800 font-semibold">{data?.dashboardLeadFunnelData?.val_order_lost} Order Lost</div>
+                                <div className="text-red-800 font-semibold">Lead Value Lost {data?.dashboardLeadFunnelData?.val_lead_lost}</div>
                             </div>
-                            <div className="w-4/12 font-semibold text-white bg-gradient-to-r from-blue-700 to-cyan-600 p-2 text-center rounded-b-full">Order Received: {data.dashboardLeadFunnelData.order_received}</div>
+                            <div className="w-4/12 font-semibold text-white bg-gradient-to-r from-blue-700 to-cyan-600 p-2 text-center rounded-b-full">Order Received: {data?.dashboardLeadFunnelData?.order_received}</div>
 
                             <div className="w-10/12 flex justify-around mt-16">
                                 <div className="w-1/2 p-2 text-center rounded flex flex-col items-center">
@@ -602,9 +904,6 @@ const Dashboard = () => {
                             </table>
                         </div>
                     )}
-
-
-
                 </div>
             </div>
 
@@ -612,7 +911,28 @@ const Dashboard = () => {
                 <div className="grid grid-cols-12 gap-2">
                     <div className="col-span-6 p-4 flex justify-between items-center">
                         <h5 className="text-lg font-semibold">Lead Management</h5>
-                        <button className="flex items-center gap-2 font-semibold bg-gradient-to-b from-blue-500 to-blue-950 text-white px-6 py-3 rounded-md"> New <img src={addButton} alt="add" className="w-6 h-6" /></button>
+                        <div className="relative" style={{ minWidth: '110px' }}>
+                            {/* <button className="flex items-center gap-2 font-semibold bg-gradient-to-b from-blue-500 to-blue-950 text-white px-6 py-3 rounded-md"> New <img src={addButton} alt="add" className="w-6 h-6" /></button> */}
+                            <button
+                                type="button"
+                                className="flex items-center gap-2 font-semibold bg-gradient-to-b from-blue-500 to-blue-950 text-white px-6 py-3 rounded-md"
+                                // className="bg-blue-500 text-white px-4 py-2 space-x-2 rounded hover:bg-blue-600 text-xs flex items-center"
+                                onClick={() => setShowDropdown((prev: boolean) => !prev)}
+                                id="addNewDropdownBtn"
+                            >
+                                <FaPlus /> <span>Add New</span>
+                                <svg className="ml-1 w-3 h-3" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                            </button>
+                            {showDropdown && (
+                                <div className="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded shadow-lg z-10">
+                                    {filterdata?.verticalData.length &&
+                                        filterdata?.verticalData.map((vd: any, indx: any) =>
+                                            <button key={indx} className="block w-full text-left px-4 py-2 text-sm hover:bg-blue-50" onClick={() => handleDropdownSelect(vd?.bm_name)}>{vd?.bm_name}</button>
+                                        )
+                                    }
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     <div className="col-span-2 p-2 flex flex-col justify-between items-center bg-gradient-to-r from-blue-800 to-blue-900 m-2 rounded-md text-white">
@@ -728,6 +1048,10 @@ const Dashboard = () => {
                 </div>
 
             </div>
+            {/* // for lead popup // */}
+            {popupOpenData?.open &&
+                <CustomPopupComponent dataObj={dataObj} filterdata={filterdata} data={leadData} setData={setleadData} popupOpenData={popupOpenData} setPopupOpenData={setPopupOpenData} setLoading={setLoading} OtherAPIcall={OtherAPIcall} Getdepot={Getdepot} Getterr={Getterr} />
+            }
 
             <Modal
                 opened={isModalOpen}
@@ -831,6 +1155,21 @@ const Dashboard = () => {
                     </div>
                 </div>
             </Modal>
+
+            {loading && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-white bg-opacity-75">
+                    <div role="status" className="animate-spin">
+                        <svg aria-hidden="true" className="h-8 w-8 fill-blue-600 text-gray-200" viewBox="0 0 100 101" fill="none">
+                            <path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z" />
+                            <path
+                                d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z"
+                                fill="currentFill"
+                            />
+                        </svg>
+                        <span className="sr-only text-white">Please Wait...</span>
+                    </div>
+                </div>
+            )}
         </>
     )
 }
