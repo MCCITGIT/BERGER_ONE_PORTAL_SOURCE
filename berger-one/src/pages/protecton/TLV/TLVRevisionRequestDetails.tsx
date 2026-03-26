@@ -19,6 +19,16 @@ import { commonAlert } from '../../../services/functions/commonAlert';
 import { TlvDetailsSubmit } from '../../../services/api/protectonEpca/TLVRevisionDepotApproval';
 import moment from 'moment';
 
+/** Server stores document names only; same prefix as TLVRevisionDepotApproval / HO approval screens. */
+const PROTECTON_VIRTUAL_DOC_BASE = 'https://bpilmobile.bergerindia.com/VIRTUAL_DOCS/PROTECTON_MOB_APP/';
+
+const resolveProtectonDocumentUrl = (ref: string): string => {
+    const s = ref.trim();
+    if (!s) return '';
+    if (/^(https?:\/\/|data:|blob:)/i.test(s)) return s;
+    return `${PROTECTON_VIRTUAL_DOC_BASE}${s.replace(/^\/+/, '')}`;
+};
+
 const TLVRevisionRequestDetails = () => {
     const user = UseAuthStore((state: any) => state.userDetails);
     const navigate = useNavigate();
@@ -233,10 +243,21 @@ const TLVRevisionRequestDetails = () => {
         setLoading(false);
     };
 
-    const convertToBase64 = (value: Blob, typeName: string) => {
+    const convertToBase64 = (value: Blob, typeName: string, fileInput?: HTMLInputElement) => {
         if (value) {
-            if (value.size > 300000) {
-                commonErrorToast(`${typeName} file too large!`);
+            if (!(value.type && value.type.startsWith('image/'))) {
+                commonErrorToast('Please select only image files (e.g. JPEG, PNG, GIF).');
+                if (fileInput) fileInput.value = '';
+                return;
+            }
+            const maxBytes = typeName === 'TLV DOC' ? 100 * 1024 : 300000;
+            if (value.size > maxBytes) {
+                commonErrorToast(
+                    typeName === 'TLV DOC'
+                        ? `${typeName} must be under 100 KB.`
+                        : `${typeName} file too large!`
+                );
+                if (fileInput) fileInput.value = '';
                 return;
             }
             const reader = new FileReader();
@@ -257,15 +278,24 @@ const TLVRevisionRequestDetails = () => {
         }
     };
     const imageChange = (event: any, flag: 'TLV DOC' | 'AADHAR DOC' | 'PAN DOC' | 'LC/BG DOC' | 'CHEQUE DOC' | 'LCBG DOC') => {
-        convertToBase64(event.target.files[0], flag);
+        convertToBase64(event.target.files[0], flag, event.target);
     };
 
-    const handleDownload = (event: React.MouseEvent<HTMLButtonElement>, fileUrl: string) => {
+    const handleDownload = (event: React.MouseEvent<HTMLButtonElement>, fileUrl: string | undefined) => {
         event.preventDefault();
+        event.stopPropagation();
+        if (!fileUrl?.trim()) {
+            commonErrorToast('No file is available to download.');
+            return;
+        }
+        const url = resolveProtectonDocumentUrl(fileUrl);
         const link = document.createElement('a');
-        link.href = fileUrl;
+        link.href = url;
         link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
         link.click();
+        link.remove();
     };
 
     const convertToDate = (dateStr: any) => {
@@ -308,12 +338,85 @@ const TLVRevisionRequestDetails = () => {
             }
         });
     }
+
+    const isFilled = (v: unknown) => String(v ?? '').trim() !== '';
+
+    const validateBeforeSubmit = (): string | null => {
+        const sub = sessionStorageData?.td_submission_type || 'TLV';
+
+        if (!detailsData?.depot?.value) return 'Please select Depot.';
+        if (!detailsData?.territory?.value) return 'Please select Territory.';
+        if (!detailsData?.dealer?.value) return 'Please select Customer.';
+
+        // if (sub === 'CREDIT_DAYS' || sub === 'TLV_AND_CREDIT_DAYS') {
+        //     if (!detailsData?.billTo?.value) return 'Please select Bill To.';
+        // }
+
+        // const hasExistingTlvProof =
+        //     Boolean(detailsData?.file_doc) || Boolean(detailsData?.table?.[0]?.file_doc);
+        // if (!tlvBase64JPEG && !hasExistingTlvProof) {
+        //     return 'Please upload proof document for increase in TLV.';
+        // }
+
+        if (sub === 'TLV' || sub === 'TLV_AND_CREDIT_DAYS') {
+            if (!isFilled(detailsData?.proposed_tlv)) return 'Please enter Requested TLV (Lakhs).';
+        }
+        if (sub === 'CREDIT_DAYS' || sub === 'TLV_AND_CREDIT_DAYS') {
+            if (!isFilled(detailsData?.proposed_cr_days)) return 'Please enter Proposed Credit Days.';
+        }
+
+        if (!isFilled(detailsData?.order_vol)) return 'Please enter Order to be Billed Volume (KL).';
+        if (!isFilled(detailsData?.order_val)) return 'Please enter Order to be Billed Value (Lakhs).';
+        if (!isFilled(detailsData?.increase_reason)) return 'Please enter Reason for Increase.';
+        if (!isFilled(detailsData?.customer_name)) return 'Please enter End Customer Name.';
+
+        if (detailsData?.lcbg_mandatory_yn === 'Y') {
+            if (!detailsData?.lcbg_opening_date) return 'Please enter LC/BG Opening Date.';
+            if (!detailsData?.lcbg_expiry_date) return 'Please enter LC/BG Expiry Date.';
+            if (!isFilled(detailsData?.lcbg_amount)) return 'Please enter LC/BG Amount (Lakhs).';
+            if (!lcbgBase64JPEG && !detailsData?.lcbg_doc) return 'Please upload LC/BG copy.';
+        }
+
+        if (detailsData?.chq_appl_yn === 'Y') {
+            if (!isFilled(detailsData?.td_blank_chq_no)) return 'Please enter Cheque No.';
+            if (!isFilled(detailsData?.td_ifsc_code)) return 'Please enter IFSC.';
+            if (!isFilled(detailsData?.bankName)) return 'Please validate IFSC to load Bank Name.';
+            if (!isFilled(detailsData?.branch)) return 'Please validate IFSC to load Branch.';
+            if (!chequeBase64JPEG && !detailsData?.td_blank_chq_doc) return 'Please upload blank cheque copy.';
+        }
+
+        const outstanding = detailsData?.outstanding || [];
+        for (let itemindexCount = 0; itemindexCount < outstanding.length; itemindexCount++) {
+            const item = outstanding[itemindexCount];
+            if (!item?.slab || item.slab === 'Total') continue;
+            if (item.od != null && Number(item.od) > 0) {
+                const uniqueId = `${itemindexCount + 1}`;
+                const collectionDateKey = `collection${uniqueId}_date`;
+                const collectionAmountKey = `collectionAmount${uniqueId}`;
+                if (!detailsData[collectionDateKey]) {
+                    return `Please enter Expected Collection Date for outstanding slab ${item.slab}.`;
+                }
+                if (!isFilled(detailsData[collectionAmountKey])) {
+                    return `Please enter Expected Collection Amount for outstanding slab ${item.slab}.`;
+                }
+            }
+        }
+
+        return null;
+    };
+
     const handleFormSubmit = () => {
+        const validationError = validateBeforeSubmit();
+        if (validationError) {
+            commonErrorToast(validationError);
+            return;
+        }
         const entity = [{
             appName: 'PROTECTON',
             userId: user.user_id || '',
             autoId: detailsData?.auto_id || 0,
             depotCode: detailsData?.depot?.value || '',
+            terrCode: detailsData?.territory?.value || '',
             dealerCode: detailsData?.dealer?.value || '',
             billtoCode: detailsData?.billTo?.value || '',
             fullName: detailsData?.full_name || '',
@@ -392,9 +495,9 @@ const TLVRevisionRequestDetails = () => {
             GetApplicableDepot();
     }, [])
 
-    useEffect(() => {
-        console.log(detailsData)
-    }, [detailsData])
+    // useEffect(() => {
+    //     console.log(detailsData)
+    // }, [detailsData])
     // useEffect(() => {
     //     console.log(selectBoxData)
     // }, [selectBoxData])
@@ -501,16 +604,21 @@ const TLVRevisionRequestDetails = () => {
                             <label className="formLabelTx">Upload relevant document as proof of increase in TLV:</label>
                             <input
                                 type="file"
-                                onChange={() => {
+                                onChange={(event) => {
                                     imageChange(event, 'TLV DOC');
                                 }}
-                                accept="image/*"
+                                accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/bmp"
                             />
                         </div>
 
                         {detailsData?.file_doc && (
                             <div className='mt-6'>
-                                <button onClick={(event) => handleDownload(event, detailsData?.table[0]?.file_doc)}>
+                                <button
+                                    type="button"
+                                    onClick={(event) =>
+                                        handleDownload(event, detailsData?.table?.[0]?.file_doc ?? detailsData?.file_doc)
+                                    }
+                                >
                                     <FaDownload />
                                 </button>
                             </div>
@@ -595,16 +703,16 @@ const TLVRevisionRequestDetails = () => {
                                                     <input
                                                         // className="w-full border rounded form-input text-sm"
                                                         type="file"
-                                                        onChange={() => {
+                                                        onChange={(event) => {
                                                             imageChange(event, 'AADHAR DOC');
                                                         }}
-                                                        accept="image/*"
+                                                        accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/bmp"
                                                     />
                                                 </div>
 
                                                 {detailsData?.aadhar_doc && (
                                                     <div className='mt-6'>
-                                                        <button onClick={(event) => handleDownload(event, detailsData?.aadhar_doc)}>
+                                                        <button type="button" onClick={(event) => handleDownload(event, detailsData?.aadhar_doc)}>
                                                             <FaDownload />
                                                         </button>
                                                     </div>
@@ -666,16 +774,16 @@ const TLVRevisionRequestDetails = () => {
                                                     <input
                                                         // className="fileTypeInput form-input"
                                                         type="file"
-                                                        onChange={() => {
+                                                        onChange={(event) => {
                                                             imageChange(event, 'PAN DOC');
                                                         }}
-                                                        accept="image/*"
+                                                        accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/bmp"
                                                     />
                                                 </div>
 
                                                 {detailsData?.pan_doc && (
                                                     <div className='mt-6'>
-                                                        <button onClick={(event) => handleDownload(event, detailsData?.pan_doc)}>
+                                                        <button type="button" onClick={(event) => handleDownload(event, detailsData?.pan_doc)}>
                                                             <FaDownload />
                                                         </button>
                                                     </div>
@@ -766,16 +874,16 @@ const TLVRevisionRequestDetails = () => {
                                                                 <input
                                                                     // className="fileTypeInput form-input"
                                                                     type="file"
-                                                                    onChange={() => {
+                                                                    onChange={(event) => {
                                                                         imageChange(event, 'LCBG DOC');
                                                                     }}
-                                                                    accept="image/*"
+                                                                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/bmp"
                                                                 />
                                                             </div>
 
                                                             {detailsData?.lcbg_doc && (
                                                                 <div className='mt-6'>
-                                                                    <button onClick={(event) => handleDownload(event, detailsData?.lcbg_doc)}>
+                                                                    <button type="button" onClick={(event) => handleDownload(event, detailsData?.lcbg_doc)}>
                                                                         <FaDownload />
                                                                     </button>
                                                                 </div>
@@ -869,13 +977,13 @@ const TLVRevisionRequestDetails = () => {
                                                                     onChange={(event) => {
                                                                         imageChange(event, 'CHEQUE DOC');
                                                                     }}
-                                                                    accept="image/*"
+                                                                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/bmp"
                                                                 />
                                                             </div>
 
                                                             {detailsData?.td_blank_chq_doc && (
                                                                 <div className='mt-6'>
-                                                                    <button onClick={(event) => handleDownload(event, detailsData?.td_blank_chq_doc)}>
+                                                                    <button type="button" onClick={(event) => handleDownload(event, detailsData?.td_blank_chq_doc)}>
                                                                         <FaDownload />
                                                                     </button>
                                                                 </div>
