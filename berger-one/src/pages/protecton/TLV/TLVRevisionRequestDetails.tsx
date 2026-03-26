@@ -416,6 +416,7 @@ const TLVRevisionRequestDetails = () => {
             userId: user.user_id || '',
             autoId: detailsData?.auto_id || 0,
             depotCode: detailsData?.depot?.value || '',
+            terrCode: detailsData?.territory?.value || '',
             dealerCode: detailsData?.dealer?.value || '',
             billtoCode: detailsData?.billTo?.value || '',
             fullName: detailsData?.full_name || '',
@@ -494,9 +495,9 @@ const TLVRevisionRequestDetails = () => {
             GetApplicableDepot();
     }, [])
 
-    useEffect(() => {
-        console.log(detailsData)
-    }, [detailsData])
+    // useEffect(() => {
+    //     console.log(detailsData)
+    // }, [detailsData])
     // useEffect(() => {
     //     console.log(selectBoxData)
     // }, [selectBoxData])
