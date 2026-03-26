@@ -19,6 +19,16 @@ import { commonAlert } from '../../../services/functions/commonAlert';
 import { TlvDetailsSubmit } from '../../../services/api/protectonEpca/TLVRevisionDepotApproval';
 import moment from 'moment';
 
+/** Server stores document names only; same prefix as TLVRevisionDepotApproval / HO approval screens. */
+const PROTECTON_VIRTUAL_DOC_BASE = 'https://bpilmobile.bergerindia.com/VIRTUAL_DOCS/PROTECTON_MOB_APP/';
+
+const resolveProtectonDocumentUrl = (ref: string): string => {
+    const s = ref.trim();
+    if (!s) return '';
+    if (/^(https?:\/\/|data:|blob:)/i.test(s)) return s;
+    return `${PROTECTON_VIRTUAL_DOC_BASE}${s.replace(/^\/+/, '')}`;
+};
+
 const TLVRevisionRequestDetails = () => {
     const user = UseAuthStore((state: any) => state.userDetails);
     const navigate = useNavigate();
@@ -271,12 +281,21 @@ const TLVRevisionRequestDetails = () => {
         convertToBase64(event.target.files[0], flag, event.target);
     };
 
-    const handleDownload = (event: React.MouseEvent<HTMLButtonElement>, fileUrl: string) => {
+    const handleDownload = (event: React.MouseEvent<HTMLButtonElement>, fileUrl: string | undefined) => {
         event.preventDefault();
+        event.stopPropagation();
+        if (!fileUrl?.trim()) {
+            commonErrorToast('No file is available to download.');
+            return;
+        }
+        const url = resolveProtectonDocumentUrl(fileUrl);
         const link = document.createElement('a');
-        link.href = fileUrl;
+        link.href = url;
         link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
         link.click();
+        link.remove();
     };
 
     const convertToDate = (dateStr: any) => {
@@ -593,7 +612,12 @@ const TLVRevisionRequestDetails = () => {
 
                         {detailsData?.file_doc && (
                             <div className='mt-6'>
-                                <button onClick={(event) => handleDownload(event, detailsData?.table[0]?.file_doc)}>
+                                <button
+                                    type="button"
+                                    onClick={(event) =>
+                                        handleDownload(event, detailsData?.table?.[0]?.file_doc ?? detailsData?.file_doc)
+                                    }
+                                >
                                     <FaDownload />
                                 </button>
                             </div>
@@ -687,7 +711,7 @@ const TLVRevisionRequestDetails = () => {
 
                                                 {detailsData?.aadhar_doc && (
                                                     <div className='mt-6'>
-                                                        <button onClick={(event) => handleDownload(event, detailsData?.aadhar_doc)}>
+                                                        <button type="button" onClick={(event) => handleDownload(event, detailsData?.aadhar_doc)}>
                                                             <FaDownload />
                                                         </button>
                                                     </div>
@@ -758,7 +782,7 @@ const TLVRevisionRequestDetails = () => {
 
                                                 {detailsData?.pan_doc && (
                                                     <div className='mt-6'>
-                                                        <button onClick={(event) => handleDownload(event, detailsData?.pan_doc)}>
+                                                        <button type="button" onClick={(event) => handleDownload(event, detailsData?.pan_doc)}>
                                                             <FaDownload />
                                                         </button>
                                                     </div>
@@ -858,7 +882,7 @@ const TLVRevisionRequestDetails = () => {
 
                                                             {detailsData?.lcbg_doc && (
                                                                 <div className='mt-6'>
-                                                                    <button onClick={(event) => handleDownload(event, detailsData?.lcbg_doc)}>
+                                                                    <button type="button" onClick={(event) => handleDownload(event, detailsData?.lcbg_doc)}>
                                                                         <FaDownload />
                                                                     </button>
                                                                 </div>
@@ -958,7 +982,7 @@ const TLVRevisionRequestDetails = () => {
 
                                                             {detailsData?.td_blank_chq_doc && (
                                                                 <div className='mt-6'>
-                                                                    <button onClick={(event) => handleDownload(event, detailsData?.td_blank_chq_doc)}>
+                                                                    <button type="button" onClick={(event) => handleDownload(event, detailsData?.td_blank_chq_doc)}>
                                                                         <FaDownload />
                                                                     </button>
                                                                 </div>
