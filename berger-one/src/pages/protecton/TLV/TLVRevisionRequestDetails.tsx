@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import Select from 'react-select';
 import { UseAuthStore } from '../../../services/store/AuthStore';
 import { useNavigate } from 'react-router-dom';
@@ -37,6 +37,8 @@ const TLVRevisionRequestDetails = () => {
     const [getTlvDetailsCalled, setGetTlvDetailsCalled] = useState<boolean>(false);
     const [detailsData, setDetailsData] = useState<any>({ auto_id: 0, depot: null, territory: null, dealer: null, billTo: null, file_doc: null, keyParam: [], outstanding: [] });
     const [loading, setLoading] = useState(false);
+    const submitInFlightRef = useRef(false);
+    const [submitLocked, setSubmitLocked] = useState(false);
     const [pageType, setPageType] = useState('');
     const [sessionStorageData, setSessionStorageData] = useState<any>({ td_submission_type: "TLV" });
     const [selectBoxData, setSelectBoxData] = useState<any>({ depot: [], territory: [], dealer: [], billTo: [], customerAndPaymentType: [] });
@@ -422,9 +424,18 @@ const TLVRevisionRequestDetails = () => {
         setLoading(false);
     };
 
+    const releaseSubmitLock = () => {
+        submitInFlightRef.current = false;
+        setSubmitLocked(false);
+    };
+
     async function showSubmitAlert(data: any) {
         commonAlert('Are you want to insert the TLV Revision Request Info?', '', 'warning').then(async (result: any) => {
-            if (result.value) {
+            if (!result.value) {
+                releaseSubmitLock();
+                return;
+            }
+            try {
                 const response: any = await TlvDetailsSubmit(data[0]);
                 if (response) {
                     if (response.statusCode == 200) {
@@ -432,7 +443,11 @@ const TLVRevisionRequestDetails = () => {
                         navigate('/Protecton/TLV/TLVRevisionRequestList/');
                     } else commonErrorToast(response.message);
                 } else commonErrorToast('Error occured while submitting TLV Revision!');
+            } finally {
+                releaseSubmitLock();
             }
+        }).catch(() => {
+            releaseSubmitLock();
         });
     }
 
@@ -503,11 +518,14 @@ const TLVRevisionRequestDetails = () => {
     };
 
     const handleFormSubmit = () => {
+        if (submitInFlightRef.current) return;
         const validationError = validateBeforeSubmit();
         if (validationError) {
             commonErrorToast(validationError);
             return;
         }
+        submitInFlightRef.current = true;
+        setSubmitLocked(true);
         const entity = [{
             appName: 'PROTECTON',
             userId: user.user_id || '',
@@ -1399,7 +1417,9 @@ const TLVRevisionRequestDetails = () => {
                         <div className="flex items-center justify-center gap-1 pb-3">
                             <button
                                 type="button"
-                                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm flex items-center"
+                                disabled={submitLocked}
+                                aria-busy={submitLocked}
+                                className={`text-white px-4 py-2 rounded text-sm flex items-center ${submitLocked ? 'cursor-not-allowed bg-green-400 opacity-70' : 'bg-green-500 hover:bg-green-600'}`}
                                 onClick={() => {
                                     handleFormSubmit();
                                 }}
@@ -1408,7 +1428,8 @@ const TLVRevisionRequestDetails = () => {
                             </button>
                             <button
                                 type="button"
-                                className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 text-sm flex items-center"
+                                disabled={submitLocked}
+                                className={`text-white px-4 py-2 rounded text-sm flex items-center ${submitLocked ? 'cursor-not-allowed bg-red-400 opacity-70' : 'bg-red-500 hover:bg-red-600'}`}
                                 onClick={() => {
                                     handleBackButton();
                                 }}
