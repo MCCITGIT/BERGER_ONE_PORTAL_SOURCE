@@ -138,6 +138,7 @@ const TLVRevisionRequestDetails = () => {
             depotCode: depot_code,
             billToCode: dlr_bill_to,
             dealerCode: dlr_dealer_code,
+            terrCode: dlr_terr_code,
             sblCode: '4',
             submissionType: td_submission_type,
             appName: 'PROTECTON',
@@ -752,6 +753,7 @@ const TLVRevisionRequestDetails = () => {
                                     depot_code: detailsData.depot?.value || '',
                                     dlr_bill_to: detailsData.billTo?.value || '',
                                     dlr_dealer_code: detailsData.dealer?.value || '',
+                                    dlr_terr_code: detailsData.territory?.value || '',
                                     td_submission_type: sessionStorageData?.td_submission_type || ''
                                 });
                                 GetCustomerAndPaymentType({ DepotCode: detailsData.depot?.value, BillToCode: detailsData.billTo?.value });
