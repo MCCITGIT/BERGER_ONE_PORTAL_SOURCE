@@ -33,8 +33,13 @@ type StoredEpcaListFilters = {
     billTo: string;
 };
 
-/** In-memory only: survives list ↔ details SPA navigation; cleared automatically on full page reload (F5). */
+/**
+ * In-memory snapshot; only applied when returning to the list from EPCADetails (see sessionStorage epcaListReturnFromDetails).
+ * Cleared on full page reload and when opening the list any other way.
+ */
 let epcaListFiltersCache: StoredEpcaListFilters | null = null;
+
+const EPCA_LIST_RETURN_FROM_DETAILS_KEY = 'epcaListReturnFromDetails';
 type PcaType = {
     // set custom column headings
     depot_regn: string;
@@ -193,6 +198,21 @@ const EPCAList = () => {
     );
 
     const loadListInitialOrRestore = async (depotList: any[]) => {
+        const returnFromDetails = sessionStorage.getItem(EPCA_LIST_RETURN_FROM_DETAILS_KEY) === '1';
+        sessionStorage.removeItem(EPCA_LIST_RETURN_FROM_DETAILS_KEY);
+
+        if (!returnFromDetails) {
+            epcaListFiltersCache = null;
+            GetPcaStatusData('PENDING').then(() => {
+                setSelectedDropdown((prev) => ({
+                    ...prev,
+                    UsersubStatus: -1,
+                }));
+                GetPcaListData();
+            });
+            return;
+        }
+
         const restored = await tryRestoreEpcaListFilters(depotList);
         if (!restored) {
             GetPcaStatusData('PENDING').then(() => {
@@ -426,6 +446,7 @@ const EPCAList = () => {
 
     const AddNewPCA = () => {
         //setLoading(true);
+        saveFiltersSnapshot(selectedDropdown, depot, applTerr, approveStatus, pcaParam);
         setCustomerProfile(null);
         setValueInSessionStorage('epcaDtlListEntryType', 'New');
         navigate('/Protecton/ePCA/EPCADetails/');
