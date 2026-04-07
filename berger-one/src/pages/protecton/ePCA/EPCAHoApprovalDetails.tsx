@@ -271,6 +271,7 @@ const EPCAHoApprovalDetails = () => {
     const handleBackButton = () => {
         // commonAlert('Are you sure?', '', 'warning').then(async (result: any) => {
         //     if (result.value) 
+        sessionStorage.setItem('epcaHoApprovalListReturnFromDetails', '1');
         navigate('/Protecton/ePCA/EPCAHOApprovalList/');
         // });
         setLoading(false);
@@ -997,6 +998,7 @@ const EPCAHoApprovalDetails = () => {
                 const response: any = await EpcaDepotApproval.PcaApprovalDetailsSubmit(transformedData);
                 if (response.response_message) {
                     commonSuccessToast('PCA HO Approval Details Updated Successfully');
+                    sessionStorage.setItem('epcaHoApprovalListReturnFromDetails', '1');
                     navigate('/Protecton/ePCA/EPCAHOApprovalList/');
                 }
             }

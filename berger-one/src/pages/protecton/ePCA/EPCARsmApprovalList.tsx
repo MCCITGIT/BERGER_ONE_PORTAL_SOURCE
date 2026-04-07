@@ -1,11 +1,34 @@
 import { UseAuthStore } from '../../../services/store/AuthStore';
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Select from 'react-select';
 import * as Epca from '../../../services/api/protectonEpca/EpcaList';
 import { MantineReactTable, useMantineReactTable, type MRT_ColumnDef } from 'mantine-react-table';
 import { EpcaHoApprovalDetailsStore } from '../../../services/store/Protecton/EpcaCustomerDetailsStore';
 import { useNavigate } from 'react-router-dom';
 import { CiSearch } from "react-icons/ci"
+
+type EpcaRsmApprovalCustomerDetails = {
+    depot_code: string;
+    depot_name: string;
+    dlr_terr_code: string;
+    acctNo: string;
+    customerName: string;
+    billTo: string;
+    main_status: string;
+    aprv_status: string;
+    sblcode?: string;
+};
+
+/**
+ * In-memory snapshot; only applied when returning from EPCARsmApprovalDetails
+ * (sessionStorage epcaRsmApprovalListReturnFromDetails). Cleared on full reload or any other list entry.
+ */
+let epcaRsmApprovalListFiltersCache: EpcaRsmApprovalCustomerDetails | null = null;
+
+const EPCA_RSM_APPROVAL_LIST_RETURN_KEY = 'epcaRsmApprovalListReturnFromDetails';
+
+const DEPOT_SELECT_PLACEHOLDER = { depot_code: '', depot_name: 'Select...' };
+const TERR_SELECT_PLACEHOLDER = { terr_code: '', terr_name: 'Select...' };
 
 const EPCARsmApprovalList = () => {
     const user = UseAuthStore((state: any) => state.userDetails);
@@ -24,9 +47,10 @@ const EPCARsmApprovalList = () => {
     });
     const [loading, setLoading] = useState(false);
     const [depot, setDepot] = useState<any>([]);
-    const [applTerr, setApplTerr] = useState<any>([]);
+    const [applTerr, setApplTerr] = useState<any>([ { ...TERR_SELECT_PLACEHOLDER } ]);
     const [approveStatus, setApproveStatus] = useState<any>([]);
-    const mainStatus = [
+    const mainStatusOptions = [
+        { label: 'Select...', value: '' },
         { label: 'Pending', value: 'PENDING' },
         { label: 'Approved', value: 'APPROVED' },
         { label: 'Rejected', value: 'REJECTED' },
@@ -34,23 +58,32 @@ const EPCARsmApprovalList = () => {
 
     const { setEpcaHoApprovalDetails } = EpcaHoApprovalDetailsStore((state) => state);
 
-    const GetApplicableDepot = async () => {
-        // setLoading(true);
+    const saveRsmApprovalFilters = (cd: EpcaRsmApprovalCustomerDetails) => {
+        epcaRsmApprovalListFiltersCache = { ...cd };
+    };
+
+    const GetApplicableDepot = async (): Promise<any[]> => {
         const data: any = {
             user_id: user.user_id,
             region: '',
             app_id: '15',
         };
+        let list: any[] = [];
         try {
             const response: any = await Epca.GetApplicableDepotList(data);
-            setDepot(response.data);
+            list = [ { ...DEPOT_SELECT_PLACEHOLDER }, ...(response.data || []) ];
+            setDepot(list);
         } catch (error) {
-            return;
+            setDepot([ { ...DEPOT_SELECT_PLACEHOLDER } ]);
         }
-        // setLoading(false);
+        return list;
     };
 
     const GetApplicableTerritory = async (cd: any) => {
+        if (!cd) {
+            setApplTerr([ { ...TERR_SELECT_PLACEHOLDER } ]);
+            return;
+        }
         setLoading(true);
         const data: any = {
             user_id: user.user_id,
@@ -59,37 +92,84 @@ const EPCARsmApprovalList = () => {
         };
         try {
             const response: any = await Epca.GetApplicableTerrList(data);
-            setApplTerr(response.data)
+            const rows = response.data || [];
+            setApplTerr([ { ...TERR_SELECT_PLACEHOLDER }, ...rows ]);
         } catch (error) {
-            return;
+            setApplTerr([ { ...TERR_SELECT_PLACEHOLDER } ]);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
-    const GetPcaRsmListData = async () => {
+    const GetPcaRsmListData = async (detailsOverride?: EpcaRsmApprovalCustomerDetails) => {
+        const cd = detailsOverride ?? customerDetails;
         setLoading(true);
-        // console.log(customerDetails)
         const data: any = {
             app_id: 15,
-            DepotCode: customerDetails.depot_code || '',
-            TerritoryCode: customerDetails.dlr_terr_code || '',
-            BillToCode: customerDetails.billTo || '',
-            AcctNo: customerDetails.acctNo || '',
-            DealerCode: customerDetails.acctNo || '',
-            DealerName: customerDetails.customerName || '',
-            SblCode: customerDetails.sblcode || '4',
-            ApprovedStatus: customerDetails.aprv_status || "PENDING_RSM",
-            MainStatus: customerDetails.main_status || 'PENDING',
+            DepotCode: cd.depot_code || '',
+            TerritoryCode: cd.dlr_terr_code || '',
+            BillToCode: cd.billTo || '',
+            AcctNo: cd.acctNo || '',
+            DealerCode: cd.acctNo || '',
+            DealerName: cd.customerName || '',
+            SblCode: cd.sblcode || '4',
+            ApprovedStatus: cd.aprv_status || 'PENDING_RSM',
+            MainStatus: cd.main_status || 'PENDING',
         };
         try {
             const response: any = await Epca.GetPcaRsmList(data);
             if (response && response.data != null && response.data != undefined) setData(response.data.table);
             else setData([]);
+            saveRsmApprovalFilters(cd);
         } catch (error) {
+            setData([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const tryRestoreRsmApprovalFilters = async (depotList: any[]): Promise<boolean> => {
+        const f = epcaRsmApprovalListFiltersCache;
+        if (!f) return false;
+        if (f.depot_code) {
+            const exists = depotList.some((d: any) => d.depot_code === f.depot_code);
+            if (!exists) return false;
+        }
+        setCustomerDetails(f);
+        if (f.depot_code) {
+            await GetApplicableTerritory(f.depot_code);
+        } else {
+            setApplTerr([ { ...TERR_SELECT_PLACEHOLDER } ]);
+        }
+        await GetPcaRsmListData(f);
+        return true;
+    };
+
+    const loadRsmApprovalInitialOrRestore = async (depotList: any[]) => {
+        const returnFromDetails = sessionStorage.getItem(EPCA_RSM_APPROVAL_LIST_RETURN_KEY) === '1';
+        sessionStorage.removeItem(EPCA_RSM_APPROVAL_LIST_RETURN_KEY);
+
+        if (!returnFromDetails) {
+            epcaRsmApprovalListFiltersCache = null;
+            await GetPcaRsmListData();
             return;
         }
-        setLoading(false);
+
+        const restored = await tryRestoreRsmApprovalFilters(depotList);
+        if (!restored) {
+            await GetPcaRsmListData();
+        }
     };
+
+    const openRsmApprovalRow = useCallback(
+        (row: any) => {
+            saveRsmApprovalFilters(customerDetails);
+            setEpcaHoApprovalDetails(row);
+            sessionStorage.setItem('epcaRsmDtlList', JSON.stringify(row));
+            navigate('/Protecton/ePCA/EPCARsmApprovalDetails/');
+        },
+        [customerDetails, setEpcaHoApprovalDetails, navigate]
+    );
 
     const GetPcaStatusData = async () => {
         // setLoading(true);
@@ -152,14 +232,7 @@ const EPCARsmApprovalList = () => {
                     return (
                         <span
                             className='text-blue-600 cursor-pointer'
-                            onClick={() => {
-                                // selectedCustomer(cell.row.original)
-                                setEpcaHoApprovalDetails(cell.row.original);
-                                // setValueInSessionStorage('epcaHoDtlList', cell.row.original);
-                                // const storage = sessionStorage;
-                                sessionStorage.setItem('epcaRsmDtlList', JSON.stringify(cell.row.original));
-                                navigate('/Protecton/ePCA/EPCARsmApprovalDetails/');
-                            }}
+                            onClick={() => openRsmApprovalRow(cell.row.original)}
                         >
                             {cell.row.original.dlr_dealer_name}
                         </span>
@@ -198,7 +271,7 @@ const EPCARsmApprovalList = () => {
                 size: 50,
             },
         ],
-        []
+        [openRsmApprovalRow]
     );
 
     const table = useMantineReactTable({
@@ -218,11 +291,52 @@ const EPCARsmApprovalList = () => {
         }
     });
 
+    const depotSelectOptions = useMemo(
+        () => depot.map((d: any) => ({ value: d.depot_code, label: d.depot_name })),
+        [depot]
+    );
+    const depotSelectValue =
+        depotSelectOptions.find((o: { value: string; label: string }) => o.value === (customerDetails?.depot_code ?? '')) ??
+        depotSelectOptions[0] ?? { value: '', label: 'Select...' };
+
+    const terrSelectOptions = useMemo(
+        () => applTerr.map((d: any) => ({ value: d.terr_code, label: d.terr_name })),
+        [applTerr]
+    );
+    const terrSelectValue =
+        terrSelectOptions.find((o: { value: string; label: string }) => o.value === (customerDetails?.dlr_terr_code ?? '')) ??
+        terrSelectOptions[0] ?? { value: '', label: 'Select...' };
+
+    const subStatusSelectOptions = useMemo(() => {
+        const filtered = customerDetails?.main_status
+            ? approveStatus.filter((item: any) => item.lov_field1_value === customerDetails?.main_status)
+            : approveStatus.filter((item: any) => item.lov_field1_value === 'PENDING');
+        return [
+            { value: '', label: 'Select...' },
+            ...filtered.map((d: any) => ({ value: d.lov_code, label: d.lov_value })),
+        ];
+    }, [approveStatus, customerDetails?.main_status]);
+
+    const subStatusSelectValue =
+        subStatusSelectOptions.find((o: { value: string; label: string }) => o.value === (customerDetails?.aprv_status ?? '')) ??
+        subStatusSelectOptions[0] ?? { value: '', label: 'Select...' };
+
+    const mainStatusSelectValue =
+        mainStatusOptions.find((m: { value: string; label: string }) => m.value === (customerDetails?.main_status ?? '')) ??
+        mainStatusOptions[0];
+
     useEffect(() => {
-        GetApplicableDepot();
-        GetPcaStatusData();
-        GetPcaRsmListData();
-    }, [])
+        let cancelled = false;
+        (async () => {
+            await GetPcaStatusData();
+            const depotList = await GetApplicableDepot();
+            if (cancelled) return;
+            await loadRsmApprovalInitialOrRestore(depotList);
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     return (
         <>
@@ -238,12 +352,23 @@ const EPCARsmApprovalList = () => {
                         <Select
                             className="text-sm"
                             isSearchable={true}
-                            value={{ value: customerDetails?.depot_code, label: customerDetails?.depot_name }}
-                            options={depot.map((d: any) => ({ value: d.depot_code, label: d.depot_name }))}
+                            value={depotSelectValue}
+                            options={depotSelectOptions}
                             // isDisabled={isEditMode}
                             onChange={(event) => {
-                                GetApplicableTerritory(event?.value);
-                                setCustomerDetails((pre: any) => ({ ...pre, depot_code: event?.value, depot_name: event?.label }))
+                                const v = event?.value ?? '';
+                                const label = event?.label ?? 'Select...';
+                                if (v) {
+                                    GetApplicableTerritory(v);
+                                } else {
+                                    setApplTerr([ { ...TERR_SELECT_PLACEHOLDER } ]);
+                                }
+                                setCustomerDetails((pre: any) => ({
+                                    ...pre,
+                                    depot_code: v,
+                                    depot_name: label,
+                                    dlr_terr_code: '',
+                                }));
                             }}
                         />
                     </div>
@@ -254,11 +379,11 @@ const EPCARsmApprovalList = () => {
                         <Select
                             className="text-sm"
                             isSearchable={true}
-                            value={{ value: applTerr?.find((a: any) => a.terr_code === customerDetails?.dlr_terr_code)?.terr_code, label: applTerr.find((a: any) => a.terr_code === customerDetails?.dlr_terr_code)?.terr_name }}
-                            options={applTerr.map((d: any) => ({ value: d.terr_code, label: d.terr_name }))}
+                            value={terrSelectValue}
+                            options={terrSelectOptions}
                             // isDisabled={isEditMode}
                             onChange={(event) => {
-                                setCustomerDetails((pre: any) => ({ ...pre, dlr_terr_code: event?.value }))
+                                setCustomerDetails((pre: any) => ({ ...pre, dlr_terr_code: event?.value ?? '' }));
                             }}
                         />
                     </div>
@@ -290,10 +415,14 @@ const EPCARsmApprovalList = () => {
                         <Select
                             className="text-sm"
                             isSearchable={true}
-                            value={mainStatus?.find((m) => m.value === customerDetails?.main_status)}
-                            options={mainStatus}
+                            value={mainStatusSelectValue}
+                            options={mainStatusOptions}
                             onChange={(event) => {
-                                setCustomerDetails((pre: any) => ({ ...pre, main_status: event?.value, aprv_status: '' }))
+                                setCustomerDetails((pre: any) => ({
+                                    ...pre,
+                                    main_status: event?.value ?? '',
+                                    aprv_status: '',
+                                }));
                             }}
                         />
                     </div>
@@ -304,10 +433,10 @@ const EPCARsmApprovalList = () => {
                         <Select
                             className="text-sm"
                             isSearchable={true}
-                            value={{ value: approveStatus?.find((a: any) => a.lov_code === customerDetails?.aprv_status)?.lov_code, label: approveStatus?.find((a: any) => a.lov_code === customerDetails?.aprv_status)?.lov_value }}
-                            options={customerDetails?.main_status ? approveStatus.filter((item: any) => item.lov_field1_value === customerDetails?.main_status).map((d: any) => ({ value: d.lov_code, label: d.lov_value })) : approveStatus.filter((item: any) => item.lov_field1_value === 'PENDING').map((d: any) => ({ value: d.lov_code, label: d.lov_value }))}
+                            value={subStatusSelectValue}
+                            options={subStatusSelectOptions}
                             onChange={(event) => {
-                                setCustomerDetails((pre: any) => ({ ...pre, aprv_status: event?.value }))
+                                setCustomerDetails((pre: any) => ({ ...pre, aprv_status: event?.value ?? '' }));
                             }}
                         />
                     </div>

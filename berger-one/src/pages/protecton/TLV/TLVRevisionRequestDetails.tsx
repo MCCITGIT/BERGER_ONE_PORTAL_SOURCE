@@ -138,6 +138,7 @@ const TLVRevisionRequestDetails = () => {
             depotCode: depot_code,
             billToCode: dlr_bill_to,
             dealerCode: dlr_dealer_code,
+            terrCode: dlr_terr_code,
             sblCode: '4',
             submissionType: td_submission_type,
             appName: 'PROTECTON',
@@ -405,6 +406,15 @@ const TLVRevisionRequestDetails = () => {
         return dateStr;
     };
 
+    /** YYYY-MM-DD for submit, or null when empty. `moment(undefined)` / `moment()` would otherwise become today. */
+    const toSubmitDateOrNull = (raw: unknown): string | null => {
+        if (raw == null) return null;
+        if (typeof raw === 'string' && !String(raw).trim()) return null;
+        const m = moment(raw);
+        if (!m.isValid()) return null;
+        return m.format('YYYY-MM-DD');
+    };
+
     const handleIFSCValidate = async () => {
         setLoading(true);
         const data = {
@@ -566,15 +576,15 @@ const TLVRevisionRequestDetails = () => {
             collectionAmount5: detailsData.collectionAmount5 ? Number(detailsData.collectionAmount5) : null,
             collectionAmount6: detailsData.collectionAmount6 ? Number(detailsData.collectionAmount6) : null,
             collectionAmount7: detailsData.collectionAmount7 ? Number(detailsData.collectionAmount7) : null,
-            lcbgOpeningDate: moment(convertToDate(detailsData.frm_date)).format('YYYY-MM-DD') == 'Invalid date' ? null : moment(convertToDate(detailsData.frm_date)).format('YYYY-MM-DD'),
-            lcbgExpiryDate: moment(convertToDate(detailsData.to_date)).format('YYYY-MM-DD') == 'Invalid date' ? null : moment(convertToDate(detailsData.to_date)).format('YYYY-MM-DD'),
-            osCollectionDate1: moment(detailsData.collection1_date).format('YYYY-MM-DD') == 'Invalid date' ? null : moment(detailsData.collection1_date).format('YYYY-MM-DD'),
-            osCollectionDate2: moment(detailsData.collection2_date).format('YYYY-MM-DD') == 'Invalid date' ? null : moment(detailsData.collection2_date).format('YYYY-MM-DD'),
-            osCollectionDate3: moment(detailsData.collection3_date).format('YYYY-MM-DD') == 'Invalid date' ? null : moment(detailsData.collection3_date).format('YYYY-MM-DD'),
-            osCollectionDate4: moment(detailsData.collection4_date).format('YYYY-MM-DD') == 'Invalid date' ? null : moment(detailsData.collection4_date).format('YYYY-MM-DD'),
-            osCollectionDate5: moment(detailsData.collection5_date).format('YYYY-MM-DD') == 'Invalid date' ? null : moment(detailsData.collection5_date).format('YYYY-MM-DD'),
-            osCollectionDate6: moment(detailsData.collection6_date).format('YYYY-MM-DD') == 'Invalid date' ? null : moment(detailsData.collection6_date).format('YYYY-MM-DD'),
-            osCollectionDate7: moment(detailsData.collection7_date).format('YYYY-MM-DD') == 'Invalid date' ? null : moment(detailsData.collection7_date).format('YYYY-MM-DD'),
+            lcbgOpeningDate: toSubmitDateOrNull(detailsData.lcbg_opening_date),
+            lcbgExpiryDate: toSubmitDateOrNull(detailsData.lcbg_expiry_date),
+            osCollectionDate1: toSubmitDateOrNull(detailsData.collection1_date),
+            osCollectionDate2: toSubmitDateOrNull(detailsData.collection2_date),
+            osCollectionDate3: toSubmitDateOrNull(detailsData.collection3_date),
+            osCollectionDate4: toSubmitDateOrNull(detailsData.collection4_date),
+            osCollectionDate5: toSubmitDateOrNull(detailsData.collection5_date),
+            osCollectionDate6: toSubmitDateOrNull(detailsData.collection6_date),
+            osCollectionDate7: toSubmitDateOrNull(detailsData.collection7_date),
             outputCode: 0,
             outputMsg: '',
             file_doc: tlvBase64JPEG
@@ -752,6 +762,7 @@ const TLVRevisionRequestDetails = () => {
                                     depot_code: detailsData.depot?.value || '',
                                     dlr_bill_to: detailsData.billTo?.value || '',
                                     dlr_dealer_code: detailsData.dealer?.value || '',
+                                    dlr_terr_code: detailsData.territory?.value || '',
                                     td_submission_type: sessionStorageData?.td_submission_type || ''
                                 });
                                 GetCustomerAndPaymentType({ DepotCode: detailsData.depot?.value, BillToCode: detailsData.billTo?.value });

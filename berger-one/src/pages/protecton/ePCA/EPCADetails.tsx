@@ -309,6 +309,7 @@ const EPCADetails = () => {
     const handleBackButton = () => {
         // commonAlert('Are you sure?', '', 'warning').then(async (result: any) => {
         //     if (result.value) {
+        sessionStorage.setItem('epcaListReturnFromDetails', '1');
         navigate('/Protecton/ePCA/EPCAList/');
         //     }
         // });
