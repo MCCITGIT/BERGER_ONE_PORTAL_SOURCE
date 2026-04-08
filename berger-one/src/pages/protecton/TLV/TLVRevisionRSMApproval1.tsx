@@ -1,4 +1,5 @@
-import { Fragment, useEffect, useMemo, useState, type ChangeEvent, type JSXElementConstructor, type Key, type ReactElement, type ReactNode, type ReactPortal } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type JSXElementConstructor, type Key, type ReactElement, type ReactNode, type ReactPortal } from "react";
+import { flushSync } from "react-dom";
 import CommonFilterComponent from './CommonFilterComponent'
 import { UseAuthStore } from '../../../services/store/AuthStore';
 import * as Epca from '../../../services/api/protectonEpca/EpcaList';
@@ -66,6 +67,21 @@ const TlvLogDto: TlvLogInit = {
     td_submission_type: '',
 };
 
+const TLV_DETAILS_RETURN_RSM_APPROVAL = '/Protecton/TLV/TLVRevisionRSMApproval';
+
+type StoredTlvApprovalListFilters = {
+    depotCode: string;
+    terrCode: string;
+    billToCode: string;
+    dealerCode: string;
+    dealerName: string;
+    mainStatus: string;
+    aprvStatus: string;
+};
+
+let tlvRsmApprovalFiltersCache: StoredTlvApprovalListFilters | null = null;
+const TLV_RSM_APPROVAL_RETURN_FROM_DETAILS_KEY = 'tlvRsmApprovalReturnFromDetails';
+
 const TLVRevisionRSMApproval1 = () => {
     const [loading, setLoading]: any = useState(false);
     const [dgData, setDgData]: any = useState([]);
@@ -83,25 +99,51 @@ const TLVRevisionRSMApproval1 = () => {
     const [tlvLogData, setTlvLogData] = useState<TlvLogInit[]>([TlvLogDto]);
     const [showTlvModal, setShowTlvModal] = useState(false);
 
+    const filterDataRef = useRef(filterData);
+    useEffect(() => {
+        filterDataRef.current = filterData;
+    }, [filterData]);
+
     const user = UseAuthStore((state: any) => state.userDetails);
 
-    const GetApplicableDepot = async () => {
+    const snapApprovalFilters = (fd: typeof filterData): StoredTlvApprovalListFilters => ({
+        depotCode: fd.depotCode ?? '',
+        terrCode: fd.terrCode ?? '',
+        billToCode: fd.billToCode ?? '',
+        dealerCode: fd.dealerCode ?? '',
+        dealerName: fd.dealerName ?? '',
+        mainStatus: fd.mainStatus ?? 'PENDING',
+        aprvStatus: fd.aprvStatus ?? '',
+    });
+
+    const saveApprovalFiltersToCache = (fd: typeof filterData) => {
+        try {
+            tlvRsmApprovalFiltersCache = snapApprovalFilters(fd);
+        } catch {
+            /* ignore */
+        }
+    };
+
+    const GetTlcRsmApprovalListData = async () => {
         setLoading(true);
+        const filterData = filterDataRef.current;
         const data: any = {
-            user_id: user.user_id,
-            region: '',
-            app_id: '15',
+            depotCode: filterData?.depotCode,
+            terrCode: filterData?.terrCode,
+            billToCode: filterData?.billToCode,
+            dealerCode: filterData?.dealerCode,
+            dealerName: filterData?.dealerName,
+            mainStatus: filterData?.mainStatus,
+            aprvStatus: filterData?.aprvStatus,
         };
         try {
-            const response: any = await Epca.GetApplicableDepotList(data);
-            const updatedDepotList = [
-                { label: 'Select...', value: '' },
-                ...response.data.map((item: any) => ({
-                    label: item.depot_name,
-                    value: item.depot_code
-                })),
-            ];
-            setSelectBoxData((prevState: any) => ({ ...prevState, depot: updatedDepotList }));
+            const response: any = await Tlv.GetTlvRSMApprovalList(data);
+            if (response.data) {
+                setDgData(response.data.table);
+            } else {
+                setDgData([]);
+            }
+            saveApprovalFiltersToCache(filterDataRef.current);
         } catch (error) {
             return;
         }
@@ -133,6 +175,7 @@ const TLVRevisionRSMApproval1 = () => {
 
     const GetPcaStatusData = async () => {
         setLoading(true);
+        const filterData = filterDataRef.current;
         const data: any = {
             status: filterData.mainStatus,
             type: 'RSM',
@@ -153,28 +196,60 @@ const TLVRevisionRSMApproval1 = () => {
         setLoading(false);
     };
 
-    const GetTlcRsmApprovalListData = async () => {
-        setLoading(true);
-        const data: any = {
-            depotCode: filterData?.depotCode,
-            terrCode: filterData?.terrCode,
-            billToCode: filterData?.billToCode,
-            dealerCode: filterData?.dealerCode,
-            dealerName: filterData?.dealerName,
-            mainStatus: filterData?.mainStatus,
-            aprvStatus: filterData?.aprvStatus,
-        };
-        try {
-            const response: any = await Tlv.GetTlvRSMApprovalList(data);
-            if (response.data) {
-                setDgData(response.data.table);
-            } else {
-                setDgData([]);
-            }
-        } catch (error) {
+    const tryRestoreRsmApprovalFilters = async (depotList: any[]): Promise<boolean> => {
+        const f = tlvRsmApprovalFiltersCache;
+        if (!f) return false;
+        if (f.depotCode && !depotList.some((d: any) => d.value === f.depotCode)) return false;
+        await GetApplicableTerritory(f.depotCode);
+        const restored = snapApprovalFilters(f);
+        filterDataRef.current = restored;
+        flushSync(() => setFilterData(restored));
+        await GetPcaStatusData();
+        await GetTlcRsmApprovalListData();
+        return true;
+    };
+
+    const loadRsmApprovalListInitialOrRestore = async (depotList: any[]) => {
+        const returnFromDetails = sessionStorage.getItem(TLV_RSM_APPROVAL_RETURN_FROM_DETAILS_KEY) === '1';
+        sessionStorage.removeItem(TLV_RSM_APPROVAL_RETURN_FROM_DETAILS_KEY);
+        if (!returnFromDetails) {
+            tlvRsmApprovalFiltersCache = null;
+            GetPcaStatusData().then(() => GetTlcRsmApprovalListData());
             return;
         }
-        setLoading(false);
+        const restored = await tryRestoreRsmApprovalFilters(depotList);
+        if (!restored) {
+            GetPcaStatusData().then(() => GetTlcRsmApprovalListData());
+        }
+    };
+
+    const GetApplicableDepot = async () => {
+        setLoading(true);
+        const data: any = {
+            user_id: user.user_id,
+            region: '',
+            app_id: '15',
+        };
+        let updatedDepotList: any[] = [];
+        try {
+            const response: any = await Epca.GetApplicableDepotList(data);
+            updatedDepotList = [
+                { label: 'Select...', value: '' },
+                ...response.data.map((item: any) => ({
+                    label: item.depot_name,
+                    value: item.depot_code
+                })),
+            ];
+            setSelectBoxData((prevState: any) => ({ ...prevState, depot: updatedDepotList }));
+        } catch (error) {
+            return;
+        } finally {
+            if (updatedDepotList.length > 0) {
+                void loadRsmApprovalListInitialOrRestore(updatedDepotList);
+            } else {
+                setLoading(false);
+            }
+        }
     };
 
     const handleSearch = () => { GetTlcRsmApprovalListData(); };
@@ -188,12 +263,17 @@ const TLVRevisionRSMApproval1 = () => {
 
     const navigate = useNavigate();
 
-    const selectedCustomer = (Lead: any) => {
-        setCustomerProfile(Lead);
-        setValueInSessionStorage('epcaTLVDtlList', Lead);
-        setValueInSessionStorage('epcaTLVDtlEntryType', 'View');
-        navigate('/Protecton/TLV/TLVRevisionRequestDetails/');
-    };
+    const selectedCustomer = useCallback(
+        (Lead: any) => {
+            saveApprovalFiltersToCache(filterData);
+            sessionStorage.setItem('tlvDetailsReturnPath', TLV_DETAILS_RETURN_RSM_APPROVAL);
+            setCustomerProfile(Lead);
+            setValueInSessionStorage('epcaTLVDtlList', Lead);
+            setValueInSessionStorage('epcaTLVDtlEntryType', 'View');
+            navigate('/Protecton/TLV/TLVRevisionRequestDetails/');
+        },
+        [filterData, setCustomerProfile, navigate]
+    );
 
     const handleEditChange = (e: ChangeEvent<HTMLInputElement>, rowIndex: number, field: string) => {
         const { value } = e.target;
@@ -430,7 +510,7 @@ const TLVRevisionRSMApproval1 = () => {
                 },
             },
         ],
-        []
+        [selectedCustomer]
     );
 
     const table = useMantineReactTable({
@@ -515,19 +595,15 @@ const TLVRevisionRSMApproval1 = () => {
     };
 
     useEffect(() => {
-        console.log('Filter Data Changed:', filterData);
-    }, [filterData])
-    useEffect(() => {
-        console.log('selectBoxData:', selectBoxData);
-    }, [selectBoxData])
-
-    useEffect(() => {
-        filterData?.depotCode && GetApplicableTerritory(filterData?.depotCode);
+        setSelectBoxData((prevState: any) => ({
+            ...prevState,
+            terr: [{ label: 'Select...', value: '' }],
+        }));
+        void GetApplicableTerritory(filterData?.depotCode ?? '');
     }, [filterData?.depotCode]);
 
     useEffect(() => {
         GetApplicableDepot();
-        filterData?.mainStatus && filterData?.aprvStatus && GetTlcRsmApprovalListData();
     }, []);
     
     useEffect(() => {

@@ -2,14 +2,14 @@ import React from 'react';
 import Select from 'react-select';
 import { CiSearch } from "react-icons/ci";
 import { FaPlus } from "react-icons/fa6";
-import { useMemo, useState, useEffect } from 'react';
+import { useCallback, useMemo, useState, useEffect } from 'react';
 import { MantineReactTable, useMantineReactTable, type MRT_ColumnDef } from 'mantine-react-table';
 import * as Epca from '../../../services/api/protectonEpca/EpcaList';
 import { TlvModuleStore } from '../../../services/store/Protecton/TlvModuleAllStore';
 import { IoEyeSharp } from 'react-icons/io5';
 import { IoMdDownload } from 'react-icons/io';
 import { useNavigate } from 'react-router-dom';
-import { selectStyles, statusSelectStyles } from '../../../styles/select-styles';
+import { selectStyles } from '../../../styles/select-styles';
 
 export interface SELECTED_DROPDOWN {
     Userdepot: number;
@@ -23,6 +23,22 @@ const selectedDropdownInit: SELECTED_DROPDOWN = {
     Userstatus: 0,
     UsersubStatus: -1,
 };
+
+type StoredTlvRevisionListFilters = {
+    depotCode: string;
+    terrCode: string;
+    mainStatusValue: string;
+    subStatusLovCode: string;
+    acctNo: string;
+    customerName: string;
+    billTo: string;
+};
+
+/** In-memory snapshot; applied when returning from TLVRevisionRequestDetails (sessionStorage tlvRevisionListReturnFromDetails). */
+let tlvRevisionListFiltersCache: StoredTlvRevisionListFilters | null = null;
+
+const TLV_LIST_RETURN_FROM_DETAILS_KEY = 'tlvRevisionListReturnFromDetails';
+const TLV_REVISION_REQUEST_LIST_PATH = '/Protecton/TLV/TLVRevisionRequestList/';
 
 type PcaType = {
     // set custom column headings
@@ -97,7 +113,7 @@ const TLVRevisionRequestList = () => {
         }
 
         if (flag == 'USER_SUB_STATUS' && e && e.target.innerText && approveStatus.length > 0) {
-            let getIndex = findSelectedTypeValue(approveStatus, 'lov_code', e.target.innerText);
+            let getIndex = findSelectedTypeValue(approveStatus, 'label', e.target.innerText);
             setSelectedDropdown((prev) => ({ ...prev, UsersubStatus: getIndex }));
         }
     };
@@ -110,6 +126,159 @@ const TLVRevisionRequestList = () => {
         }));
     };
 
+    type GetTlvListOverrides = {
+        selected?: SELECTED_DROPDOWN;
+        depotList?: any[];
+        applTerrList?: any[];
+        approveStatusList?: any[];
+        pcaParamOverride?: { acctNo: string; customerName: string; billTo: string; sblcode?: string };
+    };
+
+    const saveFiltersSnapshot = (
+        sel: SELECTED_DROPDOWN,
+        dep: any[],
+        terr: any[],
+        approve: any[],
+        pca: { acctNo: string; customerName: string; billTo: string; sblcode?: string }
+    ) => {
+        try {
+            const subLov =
+                sel.UsersubStatus != -1 && approve[sel.UsersubStatus] ? approve[sel.UsersubStatus].lov_code : '';
+            const f: StoredTlvRevisionListFilters = {
+                depotCode: sel.Userdepot != -1 && dep[sel.Userdepot] ? dep[sel.Userdepot].depot_code : '',
+                terrCode: sel.Userterritory != -1 && terr[sel.Userterritory] ? terr[sel.Userterritory].terr_code : '',
+                mainStatusValue:
+                    sel.Userstatus != -1 && mainStatus[sel.Userstatus] ? mainStatus[sel.Userstatus].value : 'PENDING',
+                subStatusLovCode: subLov,
+                acctNo: pca.acctNo,
+                customerName: pca.customerName,
+                billTo: pca.billTo,
+            };
+            tlvRevisionListFiltersCache = f;
+        } catch {
+            /* ignore */
+        }
+    };
+
+    const GetTlvRevisionListData = async (overrides?: GetTlvListOverrides) => {
+        setLoading(true);
+        const sel = overrides?.selected ?? selectedDropdown;
+        const dep = overrides?.depotList ?? depot;
+        const terr = overrides?.applTerrList ?? applTerr;
+        const approve = overrides?.approveStatusList ?? approveStatus;
+        const pca = overrides?.pcaParamOverride ?? pcaParam;
+
+        const approvedStatus =
+            sel.UsersubStatus != -1 && approve[sel.UsersubStatus]?.lov_code
+                ? approve[sel.UsersubStatus].lov_code
+                : 'PENDING_DEPOT';
+
+        const data: any = {
+            app_id: 15,
+            DepotCode: sel.Userdepot != -1 && dep[sel.Userdepot] ? dep[sel.Userdepot].depot_code : '',
+            TerritoryCode: sel.Userterritory != -1 && terr[sel.Userterritory] ? terr[sel.Userterritory].terr_code : '',
+            BillToCode: pca.billTo != '' ? pca.billTo : '',
+            AcctNo: pca.acctNo != '' ? pca.acctNo : '',
+            DealerName: pca.customerName != '' ? pca.customerName : '',
+            SblCode: pca.sblcode != null && pca.sblcode !== '' ? pca.sblcode : '4',
+            ApprovedStatus: approvedStatus,
+            MainStatus: sel.Userstatus != -1 && mainStatus[sel.Userstatus] ? mainStatus[sel.Userstatus].value : 'PENDING',
+        };
+        try {
+            const response: any = await Epca.GetTlvRevisionList(data);
+            if (response && response.data != null && response.data != undefined) setData(response.data.table);
+            else setData([]);
+            saveFiltersSnapshot(sel, dep, terr, approve, pca);
+        } catch (error) {
+            setData([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const loadListInitialOrRestore = async (depotList: any[]) => {
+        const returnFromDetails = sessionStorage.getItem(TLV_LIST_RETURN_FROM_DETAILS_KEY) === '1';
+        sessionStorage.removeItem(TLV_LIST_RETURN_FROM_DETAILS_KEY);
+
+        if (!returnFromDetails) {
+            tlvRevisionListFiltersCache = null;
+            GetPcaStatusData('PENDING').then(() => {
+                setSelectedDropdown((prev) => ({
+                    ...prev,
+                    UsersubStatus: -1,
+                }));
+                GetTlvRevisionListData();
+            });
+            return;
+        }
+
+        const restored = await tryRestoreTlvRevisionListFilters(depotList);
+        if (!restored) {
+            GetPcaStatusData('PENDING').then(() => {
+                setSelectedDropdown((prev) => ({
+                    ...prev,
+                    UsersubStatus: -1,
+                }));
+                GetTlvRevisionListData();
+            });
+        }
+    };
+
+    const tryRestoreTlvRevisionListFilters = async (depotList: any[]): Promise<boolean> => {
+        const f = tlvRevisionListFiltersCache;
+        if (!f) return false;
+        const depIdx = f.depotCode ? depotList.findIndex((d: any) => d.depot_code === f.depotCode) : 0;
+        if (f.depotCode && depIdx < 0) return false;
+
+        const mainIdx = Math.max(0, mainStatus.findIndex((m: any) => m.value === f.mainStatusValue));
+
+        let terrList: any[] = [];
+        if (f.depotCode) {
+            terrList = (await GetApplicableTerritory(f.depotCode, f.terrCode)) ?? [];
+        } else {
+            terrList = [{ label: 'Select...', value: '', terr_name: '', terr_code: '' }];
+            setApplTerr(terrList);
+        }
+
+        const subArg =
+            f.subStatusLovCode && f.subStatusLovCode !== '' ? f.subStatusLovCode : '';
+        const statusList = (await GetPcaStatusData(f.mainStatusValue || 'PENDING', subArg)) ?? [];
+
+        const terrIdx =
+            f.terrCode && terrList.length > 0
+                ? Math.max(0, terrList.findIndex((t: any) => t.terr_code === f.terrCode))
+                : 0;
+        const subIdx =
+            f.subStatusLovCode && f.subStatusLovCode !== '' && statusList.length > 0
+                ? Math.max(0, statusList.findIndex((s: any) => s.lov_code === f.subStatusLovCode))
+                : -1;
+
+        const restoredSelected: SELECTED_DROPDOWN = {
+            Userdepot: depIdx >= 0 ? depIdx : 0,
+            Userterritory: terrIdx,
+            Userstatus: mainIdx,
+            UsersubStatus: subIdx,
+        };
+
+        const mergedPca = {
+            acctNo: f.acctNo ?? '',
+            customerName: f.customerName ?? '',
+            billTo: f.billTo ?? '',
+        };
+
+        setPcaParam((prev) => ({ ...prev, ...mergedPca }));
+        setSelectedDropdown(restoredSelected);
+
+        await GetTlvRevisionListData({
+            selected: restoredSelected,
+            depotList,
+            applTerrList: terrList,
+            approveStatusList: statusList,
+            pcaParamOverride: { ...pcaParam, ...mergedPca },
+        });
+        return true;
+    };
+
     const GetApplicableDepot = async () => {
         setLoading(true);
         const data: any = {
@@ -117,10 +286,10 @@ const TLVRevisionRequestList = () => {
             region: '',
             app_id: '15',
         };
+        let updatedDepotList: any[] = [];
         try {
             const response: any = await Epca.GetApplicableDepotList(data);
-            //labelValueConverter(response.data, 'depot_name', 'depot_code');
-            const updatedDepotList = [
+            updatedDepotList = [
                 { label: 'Select...', value: '', depot_name: '', depot_code: '' },
                 ...response.data.map((item: any) => ({
                     label: item.depot_name,
@@ -132,12 +301,17 @@ const TLVRevisionRequestList = () => {
 
             setDepot(updatedDepotList);
         } catch (error) {
-            return;
+            setDepot([]);
+        } finally {
+            if (updatedDepotList.length > 0) {
+                void loadListInitialOrRestore(updatedDepotList);
+            } else {
+                setLoading(false);
+            }
         }
-        setLoading(false);
     };
 
-    const GetApplicableTerritory = async (depotCode: any) => {
+    const GetApplicableTerritory = async (depotCode: any, selectTerrCode?: string) => {
         setLoading(true);
         const data: any = {
             user_id: 'murthy',
@@ -145,28 +319,50 @@ const TLVRevisionRequestList = () => {
             app_id: '15',
         };
         try {
-            const response: any = await Epca.GetApplicableTerrList(data);
-            //labelValueConverter(response.data, 'terr_name', 'terr_code');
-            if (response.data != null && response.data != undefined) {
-                const updatedTerrList = [
-                    { label: 'Select...', value: '' },
-                    ...response.data.map((item: any) => ({
-                        label: item.terr_name,
-                        value: item.terr_code,
-                        terr_name: item.terr_name,
-                        terr_code: item.terr_code,
-                    })),
-                ];
+            let updatedTerrList: any[] = [];
+            if (depotCode) {
+                const response: any = await Epca.GetApplicableTerrList(data);
+                if (response.data != null && response.data != undefined) {
+                    updatedTerrList = [
+                        { label: 'Select...', value: '', terr_name: '', terr_code: '' },
+                        ...response.data.map((item: any) => ({
+                            label: item.terr_name,
+                            value: item.terr_code,
+                            terr_name: item.terr_name,
+                            terr_code: item.terr_code,
+                        })),
+                    ];
+                    setApplTerr(updatedTerrList);
+                } else {
+                    updatedTerrList = [];
+                    setApplTerr([]);
+                }
+            } else {
+                updatedTerrList = [{ label: 'Select...', value: '', terr_name: '', terr_code: '' }];
                 setApplTerr(updatedTerrList);
-            } else setApplTerr([]);
+            }
+
+            setSelectedDropdown((prev) => {
+                let terrIdx = 0;
+                if (selectTerrCode && updatedTerrList.length > 0) {
+                    const found = updatedTerrList.findIndex((t: any) => t.terr_code === selectTerrCode);
+                    terrIdx = found >= 0 ? found : 0;
+                }
+                return {
+                    ...prev,
+                    Userterritory: terrIdx,
+                };
+            });
+            return updatedTerrList;
         } catch (error) {
-            return;
+            setApplTerr([]);
+            return [];
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
-    const GetPcaStatusData = async (selectedStatus: any) => {
-        //setLoading(true);
+    const GetPcaStatusData = async (selectedStatus: any, preferredLovCode?: string) => {
         const data: any = {
             app_id: '15',
         };
@@ -194,60 +390,40 @@ const TLVRevisionRequestList = () => {
 
             setApproveStatus(updatedStatusList);
 
-            const currentUsersubStatusExists = updatedStatusList.some((item) => item.lov_code === selectedDropdown.UsersubStatus);
-            if (!currentUsersubStatusExists)
+            if (preferredLovCode === '') {
                 setSelectedDropdown((prev) => ({
                     ...prev,
-                    UsersubStatus: 0,
+                    UsersubStatus: -1,
                 }));
+            } else if (preferredLovCode != null && preferredLovCode !== '') {
+                const subIdx = updatedStatusList.findIndex((item: any) => item.lov_code === preferredLovCode);
+                setSelectedDropdown((prev) => ({
+                    ...prev,
+                    UsersubStatus: subIdx >= 0 ? subIdx : 0,
+                }));
+            } else {
+                const currentItem = updatedStatusList[selectedDropdown.UsersubStatus];
+                const currentUsersubStatusExists =
+                    selectedDropdown.UsersubStatus >= 0 &&
+                    currentItem &&
+                    updatedStatusList.some((item) => item.lov_code === currentItem.lov_code);
+                if (!currentUsersubStatusExists)
+                    setSelectedDropdown((prev) => ({
+                        ...prev,
+                        UsersubStatus: 0,
+                    }));
+            }
+            return updatedStatusList;
         } catch (error) {
             setApproveStatus([]);
+            return [];
         } finally {
             setLoading(false);
         }
-        //setLoading(false);
     };
 
-    // list api 
-    const GetTlvRevisionListData = async () => {
-        setLoading(true);
-        console.log(selectedDropdown, pcaParam);
-        const data: any = {
-            app_id: 15,
-            DepotCode: selectedDropdown.Userdepot != -1 ? depot[selectedDropdown.Userdepot].depot_code : '',
-            TerritoryCode: selectedDropdown.Userterritory != -1 ? applTerr[selectedDropdown.Userterritory].terr_code : '',
-            BillToCode: pcaParam.billTo != '' ? pcaParam.billTo : '',
-            AcctNo: pcaParam.acctNo != '' ? pcaParam.acctNo : '',
-            DealerName: pcaParam.customerName != '' ? pcaParam.customerName : '',
-            SblCode: pcaParam.sblcode != '' ? pcaParam.sblcode : '4',
-            // ApprovedStatus: selectedDropdown.UsersubStatus != -1 ? approveStatus[selectedDropdown.UsersubStatus].lov_code : '',
-            ApprovedStatus: selectedDropdown.UsersubStatus != -1 ? approveStatus[selectedDropdown.UsersubStatus].lov_code : 'PENDING_DEPOT',
-            MainStatus: selectedDropdown.Userstatus != -1 ? mainStatus[selectedDropdown.Userstatus].value : 'PENDING',
-        };
-        try {
-            const response: any = await Epca.GetTlvRevisionList(data);
-            if (response && response.data != null && response.data != undefined) setData(response.data.table);
-            else setData([]);
-        } catch (error) {
-            return;
-        }
-        setLoading(false);
-    };
-
-    // useEffect(() => {
-    //     GetApplicableDepot();
-    //     GetPcaStatusData();
-    //     GetTlvRevisionListData();
-    // }, []);
     useEffect(() => {
         GetApplicableDepot();
-        GetPcaStatusData('PENDING').then(() => {
-            setSelectedDropdown((prev) => ({
-                ...prev,
-                UsersubStatus: -1,
-            }));
-            GetTlvRevisionListData();
-        });
     }, []);
 
     const handleSearch = (e: any) => {
@@ -273,12 +449,17 @@ const TLVRevisionRequestList = () => {
         }
     };
 
-    const selectedCustomer = (Lead: any) => {
-        setCustomerProfile(Lead);
-        setValueInSessionStorage('epcaTLVDtlList', Lead);
-        setValueInSessionStorage('epcaTLVDtlEntryType', 'View');
-        navigate('/Protecton/TLV/TLVRevisionRequestDetails/');
-    };
+    const selectedCustomer = useCallback(
+        (Lead: any) => {
+            saveFiltersSnapshot(selectedDropdown, depot, applTerr, approveStatus, pcaParam);
+            sessionStorage.setItem('tlvDetailsReturnPath', TLV_REVISION_REQUEST_LIST_PATH);
+            setCustomerProfile(Lead);
+            setValueInSessionStorage('epcaTLVDtlList', Lead);
+            setValueInSessionStorage('epcaTLVDtlEntryType', 'View');
+            navigate('/Protecton/TLV/TLVRevisionRequestDetails/');
+        },
+        [selectedDropdown, depot, applTerr, approveStatus, pcaParam, setCustomerProfile, navigate]
+    );
     /*
     Inline CSS found in the code:
 
@@ -304,6 +485,8 @@ const TLVRevisionRequestList = () => {
     */
 
     const AddNewTLVRevisionRequest = () => {
+        saveFiltersSnapshot(selectedDropdown, depot, applTerr, approveStatus, pcaParam);
+        sessionStorage.setItem('tlvDetailsReturnPath', TLV_REVISION_REQUEST_LIST_PATH);
         setCustomerProfile(null);
         setValueInSessionStorage('epcaTLVDtlEntryType', 'New');
         navigate('/Protecton/TLV/TLVRevisionRequestDetails/');
@@ -436,7 +619,7 @@ const TLVRevisionRequestList = () => {
                 },
             },
         ],
-        []
+        [selectedCustomer]
     );
 
     const table = useMantineReactTable({
@@ -476,12 +659,24 @@ const TLVRevisionRequestList = () => {
                         <Select
                             className="text-sm"
                             isSearchable={true}
-                            value={depot[selectedDropdown.Userdepot]}
+                            value={(() => {
+                                const row =
+                                    selectedDropdown.Userdepot >= 0
+                                        ? depot[selectedDropdown.Userdepot]
+                                        : null;
+                                const code = row?.depot_code;
+                                return code
+                                    ? depot.find((option: any) => option.value === code) ?? null
+                                    : null;
+                            })()}
                             options={depot}
-                            onChange={() => {
-                                handleTypeSelect(event, 'USER_DEPOT');
+                            onChange={(opt: any) => {
+                                if (!opt) return;
+                                const getIndex = depot.findIndex((d: any) => d.depot_code === opt.depot_code);
+                                if (getIndex < 0) return;
+                                setSelectedDropdown((prev) => ({ ...prev, Userdepot: getIndex }));
+                                GetApplicableTerritory(depot[getIndex].depot_code);
                             }}
-                            styles={selectStyles}
                         />
                     </div>
 

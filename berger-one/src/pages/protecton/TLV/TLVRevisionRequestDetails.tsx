@@ -18,6 +18,7 @@ import { IoReturnUpBack } from "react-icons/io5";
 import { commonAlert } from '../../../services/functions/commonAlert';
 import { TlvDetailsSubmit } from '../../../services/api/protectonEpca/TLVRevisionDepotApproval';
 import moment from 'moment';
+import imageCompression from 'browser-image-compression';
 
 /** Server stores document names only; same prefix as TLVRevisionDepotApproval / HO approval screens. */
 const PROTECTON_VIRTUAL_DOC_BASE = 'https://bpilmobile.bergerindia.com/VIRTUAL_DOCS/PROTECTON_MOB_APP/';
@@ -29,9 +30,33 @@ const resolveProtectonDocumentUrl = (ref: string): string => {
     return `${PROTECTON_VIRTUAL_DOC_BASE}${s.replace(/^\/+/, '')}`;
 };
 
+const TLV_REVISION_REQUEST_LIST_PATH = '/Protecton/TLV/TLVRevisionRequestList/';
+const TLV_DETAILS_RETURN_PATH_KEY = 'tlvDetailsReturnPath';
+
 const TLVRevisionRequestDetails = () => {
     const user = UseAuthStore((state: any) => state.userDetails);
     const navigate = useNavigate();
+
+    /** Clears tlvDetailsReturnPath (set by the screen that opened details). Sets filter-restore flag for list / approval screens. */
+    const navigateBackToTlvOrigin = () => {
+        const path = sessionStorage.getItem(TLV_DETAILS_RETURN_PATH_KEY);
+        sessionStorage.removeItem(TLV_DETAILS_RETURN_PATH_KEY);
+        const target = path && path.length > 0 ? path : TLV_REVISION_REQUEST_LIST_PATH;
+        if (target.includes('TLVRevisionRequestList')) {
+            sessionStorage.setItem('tlvRevisionListReturnFromDetails', '1');
+        } else {
+            if (target.includes('TLVRevisionHoCommercialApproval')) {
+                sessionStorage.setItem('tlvHoCommercialApprovalReturnFromDetails', '1');
+            } else if (target.includes('TLVRevisionHoApproval')) {
+                sessionStorage.setItem('tlvHoApprovalReturnFromDetails', '1');
+            } else if (target.includes('TLVRevisionRSMApproval')) {
+                sessionStorage.setItem('tlvRsmApprovalReturnFromDetails', '1');
+            } else if (target.includes('TLVRevisionDepotApproval')) {
+                sessionStorage.setItem('tlvDepotApprovalReturnFromDetails', '1');
+            }
+        }
+        navigate(target);
+    };
 
     const [accordianOpen, setAccordianOpen] = useState<string>('');
     const [getTlvDetailsCalled, setGetTlvDetailsCalled] = useState<boolean>(false);
@@ -246,95 +271,21 @@ const TLVRevisionRequestDetails = () => {
         setLoading(false);
     };
 
-    /** Max length of any uploaded image data URL in JSON (~100 KB). Base64 adds ~4/3 vs raw bytes, so cap JPEG blob lower. */
+    /** Max length of any uploaded image data URL in JSON (~100 KB). Base64 is longer than raw file bytes. */
     const IMAGE_DATA_URL_MAX_BYTES = 100 * 1024;
-    const IMAGE_JPEG_DATA_URL_PREFIX = 'data:image/jpeg;base64,';
-    const MAX_JPEG_BLOB_BYTES_FOR_PAYLOAD = Math.max(
-        4096,
-        Math.floor(((IMAGE_DATA_URL_MAX_BYTES - IMAGE_JPEG_DATA_URL_PREFIX.length) * 3) / 4)
-    );
 
-    /** Whether the file would yield a data URL longer than IMAGE_DATA_URL_MAX_BYTES (covers any image/* type). */
-    const imageFileWouldExceedPayloadLimit = (file: File) => {
-        const prefixLen = 32; // upper bound for data:image/xxx;base64,
-        const estimated = prefixLen + Math.ceil((file.size * 4) / 3);
-        return estimated > IMAGE_DATA_URL_MAX_BYTES;
-    };
-
-    const loadImageFromFile = (file: File): Promise<HTMLImageElement> => {
-        return new Promise((resolve, reject) => {
-            const url = URL.createObjectURL(file);
-            const img = new Image();
-            img.onload = () => {
-                URL.revokeObjectURL(url);
-                resolve(img);
-            };
-            img.onerror = () => {
-                URL.revokeObjectURL(url);
-                reject(new Error('Image load failed'));
-            };
-            img.src = url;
+    /** https://github.com/Donaldcwl/browser-image-compression — resize + quality to stay near payload limit. */
+    const compressImageFile = async (file: File): Promise<File> => {
+        return imageCompression(file, {
+            maxSizeMB: 0.075,
+            maxWidthOrHeight: 2048,
+            useWebWorker: true,
+            initialQuality: 0.82,
         });
     };
 
-    /** Re-encode as JPEG via canvas until size <= maxBytes (all document uploads). */
-    const compressImageToMaxBytes = async (file: File, maxBytes: number): Promise<Blob> => {
-        const img = await loadImageFromFile(file);
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) throw new Error('Canvas unsupported');
-
-        const maxSide = 4096;
-        let width = img.naturalWidth;
-        let height = img.naturalHeight;
-        if (!width || !height) throw new Error('Invalid image dimensions');
-        if (width > maxSide || height > maxSide) {
-            const scale = maxSide / Math.max(width, height);
-            width = Math.round(width * scale);
-            height = Math.round(height * scale);
-        }
-
-        let quality = 0.92;
-
-        const encode = (): Promise<Blob | null> =>
-            new Promise((resolve) => {
-                canvas.width = width;
-                canvas.height = height;
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, width, height);
-                ctx.drawImage(img, 0, 0, width, height);
-                canvas.toBlob((b) => resolve(b), 'image/jpeg', quality);
-            });
-
-        let blob = await encode();
-        if (!blob) throw new Error('Encode failed');
-
-        let guard = 0;
-        while (blob.size > maxBytes && guard++ < 90) {
-            if (quality > 0.42) {
-                quality = Math.max(0.42, quality - 0.06);
-            } else if (width > 48 && height > 48) {
-                width = Math.max(48, Math.round(width * 0.88));
-                height = Math.max(48, Math.round(height * 0.88));
-                quality = 0.88;
-            } else {
-                quality = Math.max(0.28, quality - 0.04);
-            }
-            blob = await encode();
-            if (!blob) throw new Error('Encode failed');
-        }
-        let extra = 0;
-        while (blob.size > maxBytes && width > 32 && height > 32 && extra++ < 30) {
-            width = Math.max(32, Math.round(width * 0.85));
-            height = Math.max(32, Math.round(height * 0.85));
-            quality = 0.65;
-            blob = await encode();
-            if (!blob) throw new Error('Encode failed');
-        }
-        return blob;
-    };
-
     const convertToBase64 = (value: Blob, typeName: string, fileInput?: HTMLInputElement) => {
+        // console.log('convertToBase64', value, typeName, fileInput);
         if (value) {
             if (!(value.type && value.type.startsWith('image/'))) {
                 commonErrorToast('Please select only image files (e.g. JPEG, PNG, GIF).');
@@ -345,9 +296,10 @@ const TLVRevisionRequestDetails = () => {
             reader.readAsDataURL(value);
             reader.onload = () => {
                 const base64String: any = reader.result;
+                console.log('base64String', base64String);
                 const replacedString = base64String.replace(/(png)|(jpg)/, 'jpeg');
                 if (String(replacedString).length > IMAGE_DATA_URL_MAX_BYTES) {
-                    commonErrorToast(`${typeName} is still too large after processing. Try a simpler image.`);
+                    commonErrorToast(`${typeName} is still too large after compression. Try a smaller image.`);
                     if (fileInput) fileInput.value = '';
                     return;
                 }
@@ -366,19 +318,13 @@ const TLVRevisionRequestDetails = () => {
     const imageChange = async (event: any, flag: 'TLV DOC' | 'AADHAR DOC' | 'PAN DOC' | 'LC/BG DOC' | 'CHEQUE DOC' | 'LCBG DOC') => {
         const file = event.target.files?.[0] as File | undefined;
         if (!file) return;
-
-        if (imageFileWouldExceedPayloadLimit(file)) {
-            try {
-                const compressed = await compressImageToMaxBytes(file, MAX_JPEG_BLOB_BYTES_FOR_PAYLOAD);
-                convertToBase64(compressed, flag, event.target);
-            } catch {
-                commonErrorToast('Could not compress the image. Try another file.');
-                event.target.value = '';
-            }
-            return;
+        try {
+            const compressed = await compressImageFile(file);
+            convertToBase64(compressed, flag, event.target);
+        } catch {
+            commonErrorToast('Could not compress the image. Try another file.');
+            event.target.value = '';
         }
-
-        convertToBase64(file, flag, event.target);
     };
 
     const handleDownload = (event: React.MouseEvent<HTMLButtonElement>, fileUrl: string | undefined) => {
@@ -450,7 +396,7 @@ const TLVRevisionRequestDetails = () => {
                 if (response) {
                     if (response.statusCode == 200) {
                         commonSuccessToast(`TLV Revision Request ` + response.message);
-                        navigate('/Protecton/TLV/TLVRevisionRequestList/');
+                        navigateBackToTlvOrigin();
                     } else commonErrorToast(response.message);
                 } else commonErrorToast('Error occured while submitting TLV Revision!');
             } finally {
@@ -595,7 +541,7 @@ const TLVRevisionRequestDetails = () => {
 
     const handleBackButton = () => {
         commonAlert('Are you sure?', '', 'warning').then(async (result: any) => {
-            if (result.value) navigate('/Protecton/TLV/TLVRevisionRequestList/');
+            if (result.value) navigateBackToTlvOrigin();
         });
     };
 
@@ -1424,8 +1370,8 @@ const TLVRevisionRequestDetails = () => {
                     </div>
                     {/* {(!detailsData?.editable_yn) || (detailsData?.editable_yn && detailsData?.editable_yn !== 'N')  && */}
                     {/* {console.log("detailsData")} */}
-                    {detailsData?.editable_yn !== 'N' &&
-                        <div className="flex items-center justify-center gap-1 pb-3">
+                    <div className="flex items-center justify-center gap-1 pb-3">
+                        {detailsData?.editable_yn !== 'N' &&
                             <button
                                 type="button"
                                 disabled={submitLocked}
@@ -1437,18 +1383,18 @@ const TLVRevisionRequestDetails = () => {
                             >
                                 <IoMdSave /> &nbsp; {pageType === 'View' ? 'Update' : 'Submit'}
                             </button>
-                            <button
-                                type="button"
-                                disabled={submitLocked}
-                                className={`text-white px-4 py-2 rounded text-sm flex items-center ${submitLocked ? 'cursor-not-allowed bg-red-400 opacity-70' : 'bg-red-500 hover:bg-red-600'}`}
-                                onClick={() => {
-                                    handleBackButton();
-                                }}
-                            >
-                                <IoReturnUpBack />  &nbsp; Back
-                            </button>
-                        </div>
-                    }
+                        }
+                        <button
+                            type="button"
+                            disabled={submitLocked}
+                            className={`text-white px-4 py-2 rounded text-sm flex items-center ${submitLocked ? 'cursor-not-allowed bg-red-400 opacity-70' : 'bg-red-500 hover:bg-red-600'}`}
+                            onClick={() => {
+                                handleBackButton();
+                            }}
+                        >
+                            <IoReturnUpBack />  &nbsp; Back
+                        </button>
+                    </div>
                 </>
             }
 

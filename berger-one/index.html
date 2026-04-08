@@ -178,21 +178,19 @@
       });
     }
 
-    // Load Mappls SDK with the token
+    // Load Mappls SDK with the token (global is `mappls` on window — same as GPSmapView.tsx)
     function loadMapplsSDK(token) {
-      // var mapple;
       var script = document.createElement("script");
       script.type = "text/javascript";
-      // script.async = true; 
+      // script.async = true;
       // script.defer = true;
       script.src = "https://apis.mappls.com/advancedmaps/api/" + token + "/map_sdk?v=3.0&layer=vector";
       script.onload = function () {
-        if (mapple) {
-          console.warn("Mappls SDK Loaded", token, mapple);
+        if (typeof window !== "undefined" && window.mappls) {
+          console.warn("Mappls SDK Loaded", token, window.mappls);
           isMapplsSDKLoaded = true;
         } else {
-          // loadMapplsSDK(token);
-          console.error("Mappls SDK Load Failed", token);
+          console.error("Mappls SDK Load Failed (window.mappls missing)", token);
         }
       };
       script.onerror = function () {
