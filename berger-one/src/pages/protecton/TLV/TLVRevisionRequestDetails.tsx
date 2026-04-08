@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import Select from 'react-select';
 import { UseAuthStore } from '../../../services/store/AuthStore';
 import { useNavigate } from 'react-router-dom';
@@ -18,15 +18,52 @@ import { IoReturnUpBack } from "react-icons/io5";
 import { commonAlert } from '../../../services/functions/commonAlert';
 import { TlvDetailsSubmit } from '../../../services/api/protectonEpca/TLVRevisionDepotApproval';
 import moment from 'moment';
+import imageCompression from 'browser-image-compression';
+
+/** Server stores document names only; same prefix as TLVRevisionDepotApproval / HO approval screens. */
+const PROTECTON_VIRTUAL_DOC_BASE = 'https://bpilmobile.bergerindia.com/VIRTUAL_DOCS/PROTECTON_MOB_APP/';
+
+const resolveProtectonDocumentUrl = (ref: string): string => {
+    const s = ref.trim();
+    if (!s) return '';
+    if (/^(https?:\/\/|data:|blob:)/i.test(s)) return s;
+    return `${PROTECTON_VIRTUAL_DOC_BASE}${s.replace(/^\/+/, '')}`;
+};
+
+const TLV_REVISION_REQUEST_LIST_PATH = '/Protecton/TLV/TLVRevisionRequestList/';
+const TLV_DETAILS_RETURN_PATH_KEY = 'tlvDetailsReturnPath';
 
 const TLVRevisionRequestDetails = () => {
     const user = UseAuthStore((state: any) => state.userDetails);
     const navigate = useNavigate();
 
+    /** Clears tlvDetailsReturnPath (set by the screen that opened details). Sets filter-restore flag for list / approval screens. */
+    const navigateBackToTlvOrigin = () => {
+        const path = sessionStorage.getItem(TLV_DETAILS_RETURN_PATH_KEY);
+        sessionStorage.removeItem(TLV_DETAILS_RETURN_PATH_KEY);
+        const target = path && path.length > 0 ? path : TLV_REVISION_REQUEST_LIST_PATH;
+        if (target.includes('TLVRevisionRequestList')) {
+            sessionStorage.setItem('tlvRevisionListReturnFromDetails', '1');
+        } else {
+            if (target.includes('TLVRevisionHoCommercialApproval')) {
+                sessionStorage.setItem('tlvHoCommercialApprovalReturnFromDetails', '1');
+            } else if (target.includes('TLVRevisionHoApproval')) {
+                sessionStorage.setItem('tlvHoApprovalReturnFromDetails', '1');
+            } else if (target.includes('TLVRevisionRSMApproval')) {
+                sessionStorage.setItem('tlvRsmApprovalReturnFromDetails', '1');
+            } else if (target.includes('TLVRevisionDepotApproval')) {
+                sessionStorage.setItem('tlvDepotApprovalReturnFromDetails', '1');
+            }
+        }
+        navigate(target);
+    };
+
     const [accordianOpen, setAccordianOpen] = useState<string>('');
     const [getTlvDetailsCalled, setGetTlvDetailsCalled] = useState<boolean>(false);
     const [detailsData, setDetailsData] = useState<any>({ auto_id: 0, depot: null, territory: null, dealer: null, billTo: null, file_doc: null, keyParam: [], outstanding: [] });
     const [loading, setLoading] = useState(false);
+    const submitInFlightRef = useRef(false);
+    const [submitLocked, setSubmitLocked] = useState(false);
     const [pageType, setPageType] = useState('');
     const [sessionStorageData, setSessionStorageData] = useState<any>({ td_submission_type: "TLV" });
     const [selectBoxData, setSelectBoxData] = useState<any>({ depot: [], territory: [], dealer: [], billTo: [], customerAndPaymentType: [] });
@@ -126,6 +163,7 @@ const TLVRevisionRequestDetails = () => {
             depotCode: depot_code,
             billToCode: dlr_bill_to,
             dealerCode: dlr_dealer_code,
+            terrCode: dlr_terr_code,
             sblCode: '4',
             submissionType: td_submission_type,
             appName: 'PROTECTON',
@@ -233,15 +271,24 @@ const TLVRevisionRequestDetails = () => {
         setLoading(false);
     };
 
+    /** Max length of any uploaded image data URL in JSON (~100 KB). Base64 is longer than raw file bytes. */
+    const IMAGE_DATA_URL_MAX_BYTES = 100 * 1024;
+
+    /** https://github.com/Donaldcwl/browser-image-compression — resize + quality to stay near payload limit. */
+    const compressImageFile = async (file: File): Promise<File> => {
+        return imageCompression(file, {
+            maxSizeMB: 0.075,
+            maxWidthOrHeight: 2048,
+            useWebWorker: true,
+            initialQuality: 0.82,
+        });
+    };
+
     const convertToBase64 = (value: Blob, typeName: string, fileInput?: HTMLInputElement) => {
+        // console.log('convertToBase64', value, typeName, fileInput);
         if (value) {
             if (!(value.type && value.type.startsWith('image/'))) {
                 commonErrorToast('Please select only image files (e.g. JPEG, PNG, GIF).');
-                if (fileInput) fileInput.value = '';
-                return;
-            }
-            if (value.size > 300000) {
-                commonErrorToast(`${typeName} file too large!`);
                 if (fileInput) fileInput.value = '';
                 return;
             }
@@ -249,7 +296,13 @@ const TLVRevisionRequestDetails = () => {
             reader.readAsDataURL(value);
             reader.onload = () => {
                 const base64String: any = reader.result;
+                console.log('base64String', base64String);
                 const replacedString = base64String.replace(/(png)|(jpg)/, 'jpeg');
+                if (String(replacedString).length > IMAGE_DATA_URL_MAX_BYTES) {
+                    commonErrorToast(`${typeName} is still too large after compression. Try a smaller image.`);
+                    if (fileInput) fileInput.value = '';
+                    return;
+                }
                 if (typeName == 'TLV DOC') setTlvBase64JPEG(replacedString);
                 if (typeName == 'AADHAR DOC') setAadharBase64JPEG(replacedString);
                 if (typeName == 'PAN DOC') setPanBase64JPEG(replacedString);
@@ -262,16 +315,33 @@ const TLVRevisionRequestDetails = () => {
             };
         }
     };
-    const imageChange = (event: any, flag: 'TLV DOC' | 'AADHAR DOC' | 'PAN DOC' | 'LC/BG DOC' | 'CHEQUE DOC' | 'LCBG DOC') => {
-        convertToBase64(event.target.files[0], flag, event.target);
+    const imageChange = async (event: any, flag: 'TLV DOC' | 'AADHAR DOC' | 'PAN DOC' | 'LC/BG DOC' | 'CHEQUE DOC' | 'LCBG DOC') => {
+        const file = event.target.files?.[0] as File | undefined;
+        if (!file) return;
+        try {
+            const compressed = await compressImageFile(file);
+            convertToBase64(compressed, flag, event.target);
+        } catch {
+            commonErrorToast('Could not compress the image. Try another file.');
+            event.target.value = '';
+        }
     };
 
-    const handleDownload = (event: React.MouseEvent<HTMLButtonElement>, fileUrl: string) => {
+    const handleDownload = (event: React.MouseEvent<HTMLButtonElement>, fileUrl: string | undefined) => {
         event.preventDefault();
+        event.stopPropagation();
+        if (!fileUrl?.trim()) {
+            commonErrorToast('No file is available to download.');
+            return;
+        }
+        const url = resolveProtectonDocumentUrl(fileUrl);
         const link = document.createElement('a');
-        link.href = fileUrl;
+        link.href = url;
         link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
         link.click();
+        link.remove();
     };
 
     const convertToDate = (dateStr: any) => {
@@ -280,6 +350,15 @@ const TLVRevisionRequestDetails = () => {
             return new Date(`${year}-${month}-${day}`);
         }
         return dateStr;
+    };
+
+    /** YYYY-MM-DD for submit, or null when empty. `moment(undefined)` / `moment()` would otherwise become today. */
+    const toSubmitDateOrNull = (raw: unknown): string | null => {
+        if (raw == null) return null;
+        if (typeof raw === 'string' && !String(raw).trim()) return null;
+        const m = moment(raw);
+        if (!m.isValid()) return null;
+        return m.format('YYYY-MM-DD');
     };
 
     const handleIFSCValidate = async () => {
@@ -301,25 +380,114 @@ const TLVRevisionRequestDetails = () => {
         setLoading(false);
     };
 
+    const releaseSubmitLock = () => {
+        submitInFlightRef.current = false;
+        setSubmitLocked(false);
+    };
+
     async function showSubmitAlert(data: any) {
         commonAlert('Are you want to insert the TLV Revision Request Info?', '', 'warning').then(async (result: any) => {
-            if (result.value) {
+            if (!result.value) {
+                releaseSubmitLock();
+                return;
+            }
+            try {
                 const response: any = await TlvDetailsSubmit(data[0]);
                 if (response) {
                     if (response.statusCode == 200) {
                         commonSuccessToast(`TLV Revision Request ` + response.message);
-                        navigate('/Protecton/TLV/TLVRevisionRequestList/');
+                        navigateBackToTlvOrigin();
                     } else commonErrorToast(response.message);
                 } else commonErrorToast('Error occured while submitting TLV Revision!');
+            } finally {
+                releaseSubmitLock();
             }
+        }).catch(() => {
+            releaseSubmitLock();
         });
     }
+
+    const isFilled = (v: unknown) => String(v ?? '').trim() !== '';
+
+    const validateBeforeSubmit = (): string | null => {
+        const sub = sessionStorageData?.td_submission_type || 'TLV';
+
+        if (!detailsData?.depot?.value) return 'Please select Depot.';
+        if (!detailsData?.territory?.value) return 'Please select Territory.';
+        if (!detailsData?.dealer?.value) return 'Please select Customer.';
+
+        // if (sub === 'CREDIT_DAYS' || sub === 'TLV_AND_CREDIT_DAYS') {
+        //     if (!detailsData?.billTo?.value) return 'Please select Bill To.';
+        // }
+
+        // const hasExistingTlvProof =
+        //     Boolean(detailsData?.file_doc) || Boolean(detailsData?.table?.[0]?.file_doc);
+        // if (!tlvBase64JPEG && !hasExistingTlvProof) {
+        //     return 'Please upload proof document for increase in TLV.';
+        // }
+
+        if (sub === 'TLV' || sub === 'TLV_AND_CREDIT_DAYS') {
+            if (!isFilled(detailsData?.proposed_tlv)) return 'Please enter Requested TLV (Lakhs).';
+        }
+        if (sub === 'CREDIT_DAYS' || sub === 'TLV_AND_CREDIT_DAYS') {
+            if (!isFilled(detailsData?.proposed_cr_days)) return 'Please enter Proposed Credit Days.';
+        }
+
+        if (!isFilled(detailsData?.order_vol)) return 'Please enter Order to be Billed Volume (KL).';
+        if (!isFilled(detailsData?.order_val)) return 'Please enter Order to be Billed Value (Lakhs).';
+        if (!isFilled(detailsData?.increase_reason)) return 'Please enter Reason for Increase.';
+        if (!isFilled(detailsData?.customer_name)) return 'Please enter End Customer Name.';
+
+        if (detailsData?.lcbg_mandatory_yn === 'Y') {
+            if (!detailsData?.lcbg_opening_date) return 'Please enter LC/BG Opening Date.';
+            if (!detailsData?.lcbg_expiry_date) return 'Please enter LC/BG Expiry Date.';
+            if (!isFilled(detailsData?.lcbg_amount)) return 'Please enter LC/BG Amount (Lakhs).';
+            if (!lcbgBase64JPEG && !detailsData?.lcbg_doc) return 'Please upload LC/BG copy.';
+        }
+
+        if (detailsData?.chq_appl_yn === 'Y') {
+            if (!isFilled(detailsData?.td_blank_chq_no)) return 'Please enter Cheque No.';
+            if (!isFilled(detailsData?.td_ifsc_code)) return 'Please enter IFSC.';
+            if (!isFilled(detailsData?.bankName)) return 'Please validate IFSC to load Bank Name.';
+            if (!isFilled(detailsData?.branch)) return 'Please validate IFSC to load Branch.';
+            if (!chequeBase64JPEG && !detailsData?.td_blank_chq_doc) return 'Please upload blank cheque copy.';
+        }
+
+        const outstanding = detailsData?.outstanding || [];
+        for (let itemindexCount = 0; itemindexCount < outstanding.length; itemindexCount++) {
+            const item = outstanding[itemindexCount];
+            if (!item?.slab || item.slab === 'Total') continue;
+            if (item.od != null && Number(item.od) > 0) {
+                const uniqueId = `${itemindexCount + 1}`;
+                const collectionDateKey = `collection${uniqueId}_date`;
+                const collectionAmountKey = `collectionAmount${uniqueId}`;
+                if (!detailsData[collectionDateKey]) {
+                    return `Please enter Expected Collection Date for outstanding slab ${item.slab}.`;
+                }
+                if (!isFilled(detailsData[collectionAmountKey])) {
+                    return `Please enter Expected Collection Amount for outstanding slab ${item.slab}.`;
+                }
+            }
+        }
+
+        return null;
+    };
+
     const handleFormSubmit = () => {
+        if (submitInFlightRef.current) return;
+        const validationError = validateBeforeSubmit();
+        if (validationError) {
+            commonErrorToast(validationError);
+            return;
+        }
+        submitInFlightRef.current = true;
+        setSubmitLocked(true);
         const entity = [{
             appName: 'PROTECTON',
             userId: user.user_id || '',
             autoId: detailsData?.auto_id || 0,
             depotCode: detailsData?.depot?.value || '',
+            terrCode: detailsData?.territory?.value || '',
             dealerCode: detailsData?.dealer?.value || '',
             billtoCode: detailsData?.billTo?.value || '',
             fullName: detailsData?.full_name || '',
@@ -354,15 +522,15 @@ const TLVRevisionRequestDetails = () => {
             collectionAmount5: detailsData.collectionAmount5 ? Number(detailsData.collectionAmount5) : null,
             collectionAmount6: detailsData.collectionAmount6 ? Number(detailsData.collectionAmount6) : null,
             collectionAmount7: detailsData.collectionAmount7 ? Number(detailsData.collectionAmount7) : null,
-            lcbgOpeningDate: moment(convertToDate(detailsData.frm_date)).format('YYYY-MM-DD') == 'Invalid date' ? null : moment(convertToDate(detailsData.frm_date)).format('YYYY-MM-DD'),
-            lcbgExpiryDate: moment(convertToDate(detailsData.to_date)).format('YYYY-MM-DD') == 'Invalid date' ? null : moment(convertToDate(detailsData.to_date)).format('YYYY-MM-DD'),
-            osCollectionDate1: moment(detailsData.collection1_date).format('YYYY-MM-DD') == 'Invalid date' ? null : moment(detailsData.collection1_date).format('YYYY-MM-DD'),
-            osCollectionDate2: moment(detailsData.collection2_date).format('YYYY-MM-DD') == 'Invalid date' ? null : moment(detailsData.collection2_date).format('YYYY-MM-DD'),
-            osCollectionDate3: moment(detailsData.collection3_date).format('YYYY-MM-DD') == 'Invalid date' ? null : moment(detailsData.collection3_date).format('YYYY-MM-DD'),
-            osCollectionDate4: moment(detailsData.collection4_date).format('YYYY-MM-DD') == 'Invalid date' ? null : moment(detailsData.collection4_date).format('YYYY-MM-DD'),
-            osCollectionDate5: moment(detailsData.collection5_date).format('YYYY-MM-DD') == 'Invalid date' ? null : moment(detailsData.collection5_date).format('YYYY-MM-DD'),
-            osCollectionDate6: moment(detailsData.collection6_date).format('YYYY-MM-DD') == 'Invalid date' ? null : moment(detailsData.collection6_date).format('YYYY-MM-DD'),
-            osCollectionDate7: moment(detailsData.collection7_date).format('YYYY-MM-DD') == 'Invalid date' ? null : moment(detailsData.collection7_date).format('YYYY-MM-DD'),
+            lcbgOpeningDate: toSubmitDateOrNull(detailsData.lcbg_opening_date),
+            lcbgExpiryDate: toSubmitDateOrNull(detailsData.lcbg_expiry_date),
+            osCollectionDate1: toSubmitDateOrNull(detailsData.collection1_date),
+            osCollectionDate2: toSubmitDateOrNull(detailsData.collection2_date),
+            osCollectionDate3: toSubmitDateOrNull(detailsData.collection3_date),
+            osCollectionDate4: toSubmitDateOrNull(detailsData.collection4_date),
+            osCollectionDate5: toSubmitDateOrNull(detailsData.collection5_date),
+            osCollectionDate6: toSubmitDateOrNull(detailsData.collection6_date),
+            osCollectionDate7: toSubmitDateOrNull(detailsData.collection7_date),
             outputCode: 0,
             outputMsg: '',
             file_doc: tlvBase64JPEG
@@ -373,7 +541,7 @@ const TLVRevisionRequestDetails = () => {
 
     const handleBackButton = () => {
         commonAlert('Are you sure?', '', 'warning').then(async (result: any) => {
-            if (result.value) navigate('/Protecton/TLV/TLVRevisionRequestList/');
+            if (result.value) navigateBackToTlvOrigin();
         });
     };
 
@@ -398,9 +566,9 @@ const TLVRevisionRequestDetails = () => {
             GetApplicableDepot();
     }, [])
 
-    useEffect(() => {
-        console.log(detailsData)
-    }, [detailsData])
+    // useEffect(() => {
+    //     console.log(detailsData)
+    // }, [detailsData])
     // useEffect(() => {
     //     console.log(selectBoxData)
     // }, [selectBoxData])
@@ -516,7 +684,12 @@ const TLVRevisionRequestDetails = () => {
 
                         {detailsData?.file_doc && (
                             <div className='mt-6'>
-                                <button onClick={(event) => handleDownload(event, detailsData?.table[0]?.file_doc)}>
+                                <button
+                                    type="button"
+                                    onClick={(event) =>
+                                        handleDownload(event, detailsData?.table?.[0]?.file_doc ?? detailsData?.file_doc)
+                                    }
+                                >
                                     <FaDownload />
                                 </button>
                             </div>
@@ -535,6 +708,7 @@ const TLVRevisionRequestDetails = () => {
                                     depot_code: detailsData.depot?.value || '',
                                     dlr_bill_to: detailsData.billTo?.value || '',
                                     dlr_dealer_code: detailsData.dealer?.value || '',
+                                    dlr_terr_code: detailsData.territory?.value || '',
                                     td_submission_type: sessionStorageData?.td_submission_type || ''
                                 });
                                 GetCustomerAndPaymentType({ DepotCode: detailsData.depot?.value, BillToCode: detailsData.billTo?.value });
@@ -610,7 +784,7 @@ const TLVRevisionRequestDetails = () => {
 
                                                 {detailsData?.aadhar_doc && (
                                                     <div className='mt-6'>
-                                                        <button onClick={(event) => handleDownload(event, detailsData?.aadhar_doc)}>
+                                                        <button type="button" onClick={(event) => handleDownload(event, detailsData?.aadhar_doc)}>
                                                             <FaDownload />
                                                         </button>
                                                     </div>
@@ -681,7 +855,7 @@ const TLVRevisionRequestDetails = () => {
 
                                                 {detailsData?.pan_doc && (
                                                     <div className='mt-6'>
-                                                        <button onClick={(event) => handleDownload(event, detailsData?.pan_doc)}>
+                                                        <button type="button" onClick={(event) => handleDownload(event, detailsData?.pan_doc)}>
                                                             <FaDownload />
                                                         </button>
                                                     </div>
@@ -781,7 +955,7 @@ const TLVRevisionRequestDetails = () => {
 
                                                             {detailsData?.lcbg_doc && (
                                                                 <div className='mt-6'>
-                                                                    <button onClick={(event) => handleDownload(event, detailsData?.lcbg_doc)}>
+                                                                    <button type="button" onClick={(event) => handleDownload(event, detailsData?.lcbg_doc)}>
                                                                         <FaDownload />
                                                                     </button>
                                                                 </div>
@@ -881,7 +1055,7 @@ const TLVRevisionRequestDetails = () => {
 
                                                             {detailsData?.td_blank_chq_doc && (
                                                                 <div className='mt-6'>
-                                                                    <button onClick={(event) => handleDownload(event, detailsData?.td_blank_chq_doc)}>
+                                                                    <button type="button" onClick={(event) => handleDownload(event, detailsData?.td_blank_chq_doc)}>
                                                                         <FaDownload />
                                                                     </button>
                                                                 </div>
@@ -1196,28 +1370,31 @@ const TLVRevisionRequestDetails = () => {
                     </div>
                     {/* {(!detailsData?.editable_yn) || (detailsData?.editable_yn && detailsData?.editable_yn !== 'N')  && */}
                     {/* {console.log("detailsData")} */}
-                    {detailsData?.editable_yn !== 'N' &&
-                        <div className="flex items-center justify-center gap-1 pb-3">
+                    <div className="flex items-center justify-center gap-1 pb-3">
+                        {detailsData?.editable_yn !== 'N' &&
                             <button
                                 type="button"
-                                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm flex items-center"
+                                disabled={submitLocked}
+                                aria-busy={submitLocked}
+                                className={`text-white px-4 py-2 rounded text-sm flex items-center ${submitLocked ? 'cursor-not-allowed bg-green-400 opacity-70' : 'bg-green-500 hover:bg-green-600'}`}
                                 onClick={() => {
                                     handleFormSubmit();
                                 }}
                             >
                                 <IoMdSave /> &nbsp; {pageType === 'View' ? 'Update' : 'Submit'}
                             </button>
-                            <button
-                                type="button"
-                                className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 text-sm flex items-center"
-                                onClick={() => {
-                                    handleBackButton();
-                                }}
-                            >
-                                <IoReturnUpBack />  &nbsp; Back
-                            </button>
-                        </div>
-                    }
+                        }
+                        <button
+                            type="button"
+                            disabled={submitLocked}
+                            className={`text-white px-4 py-2 rounded text-sm flex items-center ${submitLocked ? 'cursor-not-allowed bg-red-400 opacity-70' : 'bg-red-500 hover:bg-red-600'}`}
+                            onClick={() => {
+                                handleBackButton();
+                            }}
+                        >
+                            <IoReturnUpBack />  &nbsp; Back
+                        </button>
+                    </div>
                 </>
             }
 

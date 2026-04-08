@@ -322,7 +322,7 @@ function App() {
             element: <KeyAccountMaster />,
           },
           {
-            path: '/NewDashboard', // ----------hv 2 ch------------
+            path: '/PerformanceWindow', // ----------hv 2 ch------------
             element: <NewDashboard />,
           },
         ],
@@ -353,7 +353,7 @@ function App() {
         <Route path="/" element={<ProtectedRoute><FixedLayout /></ProtectedRoute>}>
           <Route index element={<Dashboard />} />
           {/* ----------hv 2 ch------------ */}
-          <Route path="/NewDashboard" element={<NewDashboard />} />
+          <Route path="/PerformanceWindow" element={<NewDashboard />} />
           {/* ----------hv 2 ch------------ */}
           <Route path="/admin/FromMenuMaster" element={<FromMenuMaster />} />
           <Route path="/admin/UserFormAccess" element={<UserFormAccess />} />

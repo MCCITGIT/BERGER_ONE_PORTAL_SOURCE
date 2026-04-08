@@ -1,4 +1,5 @@
-import { Fragment, useEffect, useMemo, useState, type ChangeEvent, type JSXElementConstructor, type Key, type ReactElement, type ReactNode, type ReactPortal } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type JSXElementConstructor, type Key, type ReactElement, type ReactNode, type ReactPortal } from "react";
+import { flushSync } from "react-dom";
 import CommonFilterComponent from './CommonFilterComponent'
 import { UseAuthStore } from '../../../services/store/AuthStore';
 import * as Tlv from '../../../services/api/protectonEpca/TLVRevisionRSMApproval';
@@ -69,6 +70,21 @@ const TlvLogDto: TlvLogInit = {
     td_submission_type: '',
 };
 
+const TLV_DETAILS_RETURN_HO_APPROVAL = '/Protecton/TLV/TLVRevisionHoApproval';
+
+type StoredTlvApprovalListFilters = {
+    depotCode: string;
+    terrCode: string;
+    billToCode: string;
+    dealerCode: string;
+    dealerName: string;
+    mainStatus: string;
+    aprvStatus: string;
+};
+
+let tlvHoApprovalFiltersCache: StoredTlvApprovalListFilters | null = null;
+const TLV_HO_APPROVAL_RETURN_FROM_DETAILS_KEY = 'tlvHoApprovalReturnFromDetails';
+
 const TLVRevisionHoApproval1 = () => {
     const [loading, setLoading]: any = useState(false);
     const [dgData, setDgData]: any = useState([]);
@@ -86,25 +102,52 @@ const TLVRevisionHoApproval1 = () => {
     const [tlvLogData, setTlvLogData] = useState<TlvLogInit[]>([TlvLogDto]);
     const [showTlvModal, setShowTlvModal] = useState(false);
 
+    const filterDataRef = useRef(filterData);
+    useEffect(() => {
+        filterDataRef.current = filterData;
+    }, [filterData]);
+
     const user = UseAuthStore((state: any) => state.userDetails);
 
-    const GetApplicableDepot = async () => {
+    const snapApprovalFilters = (fd: typeof filterData): StoredTlvApprovalListFilters => ({
+        depotCode: fd.depotCode ?? '',
+        terrCode: fd.terrCode ?? '',
+        billToCode: fd.billToCode ?? '',
+        dealerCode: fd.dealerCode ?? '',
+        dealerName: fd.dealerName ?? '',
+        mainStatus: fd.mainStatus ?? 'PENDING',
+        aprvStatus: fd.aprvStatus ?? '',
+    });
+
+    const saveApprovalFiltersToCache = (fd: typeof filterData) => {
+        try {
+            tlvHoApprovalFiltersCache = snapApprovalFilters(fd);
+        } catch {
+            /* ignore */
+        }
+    };
+
+    // list api 
+    const GetTlcHoApprovalListData = async () => {
         setLoading(true);
+        const filterData = filterDataRef.current;
         const data: any = {
-            user_id: user.user_id,
-            region: '',
-            app_id: '15',
+            depotCode: filterData?.depotCode,
+            terrCode: filterData?.terrCode,
+            billToCode: filterData?.billToCode,
+            dealerCode: filterData?.dealerCode,
+            dealerName: filterData?.dealerName,
+            mainStatus: filterData?.mainStatus,
+            aprvStatus: filterData?.aprvStatus,
         };
         try {
-            const response: any = await Epca.GetApplicableDepotList(data);
-            const updatedDepotList = [
-                { label: 'Select...', value: '' },
-                ...response.data.map((item: any) => ({
-                    label: item.depot_name,
-                    value: item.depot_code
-                })),
-            ];
-            setSelectBoxData((prevState: any) => ({ ...prevState, depot: updatedDepotList }));
+            const response: any = await TlvHo.GetTlvHOApprovalList(data);
+            if (response.data) {
+                setDgData(response.data.table);
+            } else {
+                setDgData([]);
+            }
+            saveApprovalFiltersToCache(filterDataRef.current);
         } catch (error) {
             return;
         }
@@ -136,6 +179,7 @@ const TLVRevisionHoApproval1 = () => {
 
     const GetPcaStatusData = async () => {
         setLoading(true);
+        const filterData = filterDataRef.current;
         const data: any = {
             status: filterData.mainStatus,
             type: 'HO',
@@ -156,29 +200,60 @@ const TLVRevisionHoApproval1 = () => {
         setLoading(false);
     };
 
-    // list api 
-    const GetTlcHoApprovalListData = async () => {
-        setLoading(true);
-        const data: any = {
-            depotCode: filterData?.depotCode,
-            terrCode: filterData?.terrCode,
-            billToCode: filterData?.billToCode,
-            dealerCode: filterData?.dealerCode,
-            dealerName: filterData?.dealerName,
-            mainStatus: filterData?.mainStatus,
-            aprvStatus: filterData?.aprvStatus,
-        };
-        try {
-            const response: any = await TlvHo.GetTlvHOApprovalList(data);
-            if (response.data) {
-                setDgData(response.data.table);
-            } else {
-                setDgData([]);
-            }
-        } catch (error) {
+    const tryRestoreHoApprovalFilters = async (depotList: any[]): Promise<boolean> => {
+        const f = tlvHoApprovalFiltersCache;
+        if (!f) return false;
+        if (f.depotCode && !depotList.some((d: any) => d.value === f.depotCode)) return false;
+        await GetApplicableTerritory(f.depotCode);
+        const restored = snapApprovalFilters(f);
+        filterDataRef.current = restored;
+        flushSync(() => setFilterData(restored));
+        await GetPcaStatusData();
+        await GetTlcHoApprovalListData();
+        return true;
+    };
+
+    const loadHoApprovalListInitialOrRestore = async (depotList: any[]) => {
+        const returnFromDetails = sessionStorage.getItem(TLV_HO_APPROVAL_RETURN_FROM_DETAILS_KEY) === '1';
+        sessionStorage.removeItem(TLV_HO_APPROVAL_RETURN_FROM_DETAILS_KEY);
+        if (!returnFromDetails) {
+            tlvHoApprovalFiltersCache = null;
+            GetPcaStatusData().then(() => GetTlcHoApprovalListData());
             return;
         }
-        setLoading(false);
+        const restored = await tryRestoreHoApprovalFilters(depotList);
+        if (!restored) {
+            GetPcaStatusData().then(() => GetTlcHoApprovalListData());
+        }
+    };
+
+    const GetApplicableDepot = async () => {
+        setLoading(true);
+        const data: any = {
+            user_id: user.user_id,
+            region: '',
+            app_id: '15',
+        };
+        let updatedDepotList: any[] = [];
+        try {
+            const response: any = await Epca.GetApplicableDepotList(data);
+            updatedDepotList = [
+                { label: 'Select...', value: '' },
+                ...response.data.map((item: any) => ({
+                    label: item.depot_name,
+                    value: item.depot_code
+                })),
+            ];
+            setSelectBoxData((prevState: any) => ({ ...prevState, depot: updatedDepotList }));
+        } catch (error) {
+            return;
+        } finally {
+            if (updatedDepotList.length > 0) {
+                void loadHoApprovalListInitialOrRestore(updatedDepotList);
+            } else {
+                setLoading(false);
+            }
+        }
     };
 
     const handleSearch = () => { GetTlcHoApprovalListData(); };
@@ -192,12 +267,17 @@ const TLVRevisionHoApproval1 = () => {
 
     const navigate = useNavigate();
 
-    const selectedCustomer = (Lead: any) => {
-        setCustomerProfile(Lead);
-        setValueInSessionStorage('epcaTLVDtlList', Lead);
-        setValueInSessionStorage('epcaTLVDtlEntryType', 'View');
-        navigate('/Protecton/TLV/TLVRevisionRequestDetails/');
-    };
+    const selectedCustomer = useCallback(
+        (Lead: any) => {
+            saveApprovalFiltersToCache(filterData);
+            sessionStorage.setItem('tlvDetailsReturnPath', TLV_DETAILS_RETURN_HO_APPROVAL);
+            setCustomerProfile(Lead);
+            setValueInSessionStorage('epcaTLVDtlList', Lead);
+            setValueInSessionStorage('epcaTLVDtlEntryType', 'View');
+            navigate('/Protecton/TLV/TLVRevisionRequestDetails/');
+        },
+        [filterData, setCustomerProfile, navigate]
+    );
 
     const handleEditChange = (e: ChangeEvent<HTMLInputElement>, rowIndex: number, field: string) => {
         const { value } = e.target;
@@ -439,7 +519,7 @@ const TLVRevisionHoApproval1 = () => {
                 },
             },
         ],
-        []
+        [selectedCustomer]
     );
 
     const table = useMantineReactTable({
@@ -524,12 +604,15 @@ const TLVRevisionHoApproval1 = () => {
     };
 
     useEffect(() => {
-        filterData?.depotCode && GetApplicableTerritory(filterData?.depotCode);
+        setSelectBoxData((prevState: any) => ({
+            ...prevState,
+            terr: [{ label: 'Select...', value: '' }],
+        }));
+        void GetApplicableTerritory(filterData?.depotCode ?? '');
     }, [filterData?.depotCode]);
 
     useEffect(() => {
         GetApplicableDepot();
-        filterData?.mainStatus && filterData?.aprvStatus && GetTlcHoApprovalListData();
     }, []);
 
     useEffect(() => {

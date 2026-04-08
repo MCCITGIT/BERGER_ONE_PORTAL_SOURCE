@@ -4,6 +4,8 @@ import pkg from './package.json'
 // https://vitejs.dev/config/
 export default defineConfig({
   base: '/BERGERONE/',
+  /** Outside `node_modules` so the pre-bundle cache is not orphaned after installs / antivirus locks. */
+  cacheDir: '.vite',
   plugins: [react()],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),

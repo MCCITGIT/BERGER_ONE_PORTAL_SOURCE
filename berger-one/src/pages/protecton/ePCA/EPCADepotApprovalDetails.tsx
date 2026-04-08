@@ -957,6 +957,7 @@ const EPCADepotApprovalDetails = () => {
         setLoading(true);
         // commonAlert('Are you sure?', '', 'warning').then(async (result: any) => {
         //     if (result.value) {
+        sessionStorage.setItem('epcaDepotApprovalListReturnFromDetails', '1');
         navigate('/Protecton/ePCA/EPCADepotApprovalList/');
         //     }
         // });
@@ -1040,6 +1041,7 @@ const EPCADepotApprovalDetails = () => {
                 const response: any = await EpcaDepotApproval.PcaApprovalDetailsSubmit(transformedData);
                 if (response.response_message) {
                     commonSuccessToast('PCA Depot Approval details Updated Successfully');
+                    sessionStorage.setItem('epcaDepotApprovalListReturnFromDetails', '1');
                     navigate('/Protecton/ePCA/EPCADepotApprovalList/');
                 }
             }

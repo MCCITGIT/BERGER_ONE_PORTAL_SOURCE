@@ -2,7 +2,7 @@
 import Select from 'react-select';
 import { FaPlus } from "react-icons/fa6";
 import { CiSearch } from "react-icons/ci";
-import { useMemo, useState, useEffect } from 'react';
+import { useCallback, useMemo, useState, useEffect } from 'react';
 import { MantineReactTable, useMantineReactTable, type MRT_ColumnDef } from 'mantine-react-table';
 import * as Epca from '../../../services/api/protectonEpca/EpcaList';
 import Cookies from 'js-cookie';
@@ -22,6 +22,24 @@ const selectedDropdownInit: SELECTED_DROPDOWN = {
     Userstatus: 0,
     UsersubStatus: -1,
 };
+
+type StoredEpcaListFilters = {
+    depotCode: string;
+    terrCode: string;
+    mainStatusValue: string;
+    subStatusLovCode: string;
+    acctNo: string;
+    customerName: string;
+    billTo: string;
+};
+
+/**
+ * In-memory snapshot; only applied when returning to the list from EPCADetails (see sessionStorage epcaListReturnFromDetails).
+ * Cleared on full page reload and when opening the list any other way.
+ */
+let epcaListFiltersCache: StoredEpcaListFilters | null = null;
+
+const EPCA_LIST_RETURN_FROM_DETAILS_KEY = 'epcaListReturnFromDetails';
 type PcaType = {
     // set custom column headings
     depot_regn: string;
@@ -64,13 +82,6 @@ const EPCAList = () => {
         storage.setItem(key, JSON.stringify(value));
     };
 
-    const selectedCustomer = async (Lead: any) => {
-        setCustomerProfile(Lead);
-        setValueInSessionStorage('epcaDtlList', Lead);
-        setValueInSessionStorage('epcaDtlListEntryType', 'View');
-        await navigate('/Protecton/ePCA/EPCADetails/');
-    };
-
     const findSelectedTypeValue = (arr: any[], arrPropName: string, checkValue: string) => {
         if (arr && arr.length > 0) {
             const selectedValue = arr.findIndex((item: any) => item[arrPropName] == checkValue);
@@ -110,6 +121,164 @@ const EPCAList = () => {
         }));
     };
 
+    type GetPcaListOverrides = {
+        selected?: SELECTED_DROPDOWN;
+        depotList?: any[];
+        applTerrList?: any[];
+        approveStatusList?: any[];
+        pcaParamOverride?: { acctNo: string; customerName: string; billTo: string; sblcode?: string };
+    };
+
+    const saveFiltersSnapshot = (
+        sel: SELECTED_DROPDOWN,
+        dep: any[],
+        terr: any[],
+        approve: any[],
+        pca: { acctNo: string; customerName: string; billTo: string; sblcode?: string }
+    ) => {
+        try {
+            const f: StoredEpcaListFilters = {
+                depotCode: sel.Userdepot != -1 && dep[sel.Userdepot] ? dep[sel.Userdepot].depot_code : '',
+                terrCode: sel.Userterritory != -1 && terr[sel.Userterritory] ? terr[sel.Userterritory].terr_code : '',
+                mainStatusValue:
+                    sel.Userstatus != -1 && mainStatus[sel.Userstatus] ? mainStatus[sel.Userstatus].value : 'PENDING',
+                subStatusLovCode:
+                    sel.UsersubStatus != -1 && approve[sel.UsersubStatus] ? approve[sel.UsersubStatus].lov_code : '',
+                acctNo: pca.acctNo,
+                customerName: pca.customerName,
+                billTo: pca.billTo,
+            };
+            epcaListFiltersCache = f;
+        } catch {
+            /* ignore */
+        }
+    };
+
+    const GetPcaListData = async (overrides?: GetPcaListOverrides) => {
+        setLoading(true);
+        const sel = overrides?.selected ?? selectedDropdown;
+        const dep = overrides?.depotList ?? depot;
+        const terr = overrides?.applTerrList ?? applTerr;
+        const approve = overrides?.approveStatusList ?? approveStatus;
+        const pca = overrides?.pcaParamOverride ?? pcaParam;
+
+        const data: any = {
+            app_id: 15,
+            DepotCode: sel.Userdepot != -1 && dep[sel.Userdepot] ? dep[sel.Userdepot].depot_code : '',
+            TerritoryCode: sel.Userterritory != -1 && terr[sel.Userterritory] ? terr[sel.Userterritory].terr_code : '',
+            BillToCode: pca.billTo != '' ? pca.billTo : '',
+            AcctNo: pca.acctNo != '' ? pca.acctNo : '',
+            DealerName: pca.customerName != '' ? pca.customerName : '',
+            SblCode: pca.sblcode != null && pca.sblcode !== '' ? pca.sblcode : '4',
+            ApprovedStatus:
+                sel.UsersubStatus != -1 && approve[sel.UsersubStatus] ? approve[sel.UsersubStatus].lov_code : '',
+            MainStatus: sel.Userstatus != -1 && mainStatus[sel.Userstatus] ? mainStatus[sel.Userstatus].value : 'PENDING',
+        };
+        try {
+            const response: any = await Epca.GetPcaList(data);
+            if (response && response.data != null && response.data != undefined) setData(response.data.table);
+            else setData([]);
+            saveFiltersSnapshot(sel, dep, terr, approve, pca);
+        } catch (error) {
+            setData([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const selectedCustomer = useCallback(
+        async (Lead: any) => {
+            saveFiltersSnapshot(selectedDropdown, depot, applTerr, approveStatus, pcaParam);
+            setCustomerProfile(Lead);
+            setValueInSessionStorage('epcaDtlList', Lead);
+            setValueInSessionStorage('epcaDtlListEntryType', 'View');
+            await navigate('/Protecton/ePCA/EPCADetails/');
+        },
+        [selectedDropdown, depot, applTerr, approveStatus, pcaParam, setCustomerProfile, navigate]
+    );
+
+    const loadListInitialOrRestore = async (depotList: any[]) => {
+        const returnFromDetails = sessionStorage.getItem(EPCA_LIST_RETURN_FROM_DETAILS_KEY) === '1';
+        sessionStorage.removeItem(EPCA_LIST_RETURN_FROM_DETAILS_KEY);
+
+        if (!returnFromDetails) {
+            epcaListFiltersCache = null;
+            GetPcaStatusData('PENDING').then(() => {
+                setSelectedDropdown((prev) => ({
+                    ...prev,
+                    UsersubStatus: -1,
+                }));
+                GetPcaListData();
+            });
+            return;
+        }
+
+        const restored = await tryRestoreEpcaListFilters(depotList);
+        if (!restored) {
+            GetPcaStatusData('PENDING').then(() => {
+                setSelectedDropdown((prev) => ({
+                    ...prev,
+                    UsersubStatus: -1,
+                }));
+                GetPcaListData();
+            });
+        }
+    };
+
+    const tryRestoreEpcaListFilters = async (depotList: any[]): Promise<boolean> => {
+        const f = epcaListFiltersCache;
+        if (!f) return false;
+        const depIdx = f.depotCode ? depotList.findIndex((d: any) => d.depot_code === f.depotCode) : 0;
+        if (f.depotCode && depIdx < 0) return false;
+
+        const mainIdx = Math.max(0, mainStatus.findIndex((m: any) => m.value === f.mainStatusValue));
+
+        let terrList: any[] = [];
+        if (f.depotCode) {
+            terrList = (await GetApplicableTerritory(f.depotCode, f.terrCode)) ?? [];
+        } else {
+            terrList = [{ label: 'Select...', value: '', terr_name: '', terr_code: '' }];
+            setApplTerr(terrList);
+        }
+
+        const statusList =
+            (await GetPcaStatusData(f.mainStatusValue || 'PENDING', f.subStatusLovCode)) ?? [];
+
+        const terrIdx =
+            f.terrCode && terrList.length > 0
+                ? Math.max(0, terrList.findIndex((t: any) => t.terr_code === f.terrCode))
+                : 0;
+        const subIdx =
+            f.subStatusLovCode && statusList.length > 0
+                ? Math.max(0, statusList.findIndex((s: any) => s.lov_code === f.subStatusLovCode))
+                : 0;
+
+        const restoredSelected: SELECTED_DROPDOWN = {
+            Userdepot: depIdx >= 0 ? depIdx : 0,
+            Userterritory: terrIdx,
+            Userstatus: mainIdx,
+            UsersubStatus: subIdx,
+        };
+
+        const mergedPca = {
+            acctNo: f.acctNo ?? '',
+            customerName: f.customerName ?? '',
+            billTo: f.billTo ?? '',
+        };
+
+        setPcaParam((prev) => ({ ...prev, ...mergedPca }));
+        setSelectedDropdown(restoredSelected);
+
+        await GetPcaListData({
+            selected: restoredSelected,
+            depotList,
+            applTerrList: terrList,
+            approveStatusList: statusList,
+            pcaParamOverride: { ...pcaParam, ...mergedPca },
+        });
+        return true;
+    };
+
     const GetApplicableDepot = async () => {
         setLoading(true);
         if (user) {
@@ -118,9 +287,10 @@ const EPCAList = () => {
                 region: '',
                 app_id: '15',
             };
+            let updatedDepotList: any[] = [];
             try {
                 const response: any = await Epca.GetApplicableDepotList(data);
-                const updatedDepotList = [
+                updatedDepotList = [
                     { label: 'Select...', value: '', depot_name: '', depot_code: '' },
                     ...response.data.map((item: any) => ({
                         label: item.depot_name,
@@ -134,14 +304,11 @@ const EPCAList = () => {
                 setLoading(false);
                 setDepot([]);
             } finally {
-                // setLoading(false);
-                GetPcaStatusData('PENDING').then(() => {
-                    setSelectedDropdown((prev) => ({
-                        ...prev,
-                        UsersubStatus: -1,
-                    }));
-                    GetPcaListData();
-                });
+                if (user && updatedDepotList.length > 0) {
+                    void loadListInitialOrRestore(updatedDepotList);
+                } else if (user) {
+                    setLoading(false);
+                }
             }
         } else {
             localStorage.clear();
@@ -152,7 +319,7 @@ const EPCAList = () => {
         }
     };
 
-    const GetApplicableTerritory = async (depotCode: any) => {
+    const GetApplicableTerritory = async (depotCode: any, selectTerrCode?: string) => {
         setLoading(true);
         if (user) {
             const data: any = {
@@ -161,10 +328,11 @@ const EPCAList = () => {
                 app_id: '15',
             };
             try {
+                let updatedTerrList: any[] = [];
                 if (depotCode) {
                     const response: any = await Epca.GetApplicableTerrList(data);
                     if (response.data != null && response.data != undefined) {
-                        const updatedTerrList = [
+                        updatedTerrList = [
                             { label: 'Select...', value: '', terr_name: '', terr_code: '' },
                             ...response.data.map((item: any) => ({
                                 label: item.terr_name,
@@ -174,18 +342,30 @@ const EPCAList = () => {
                             })),
                         ];
                         setApplTerr(updatedTerrList);
-                    } else setApplTerr([]);
+                    } else {
+                        updatedTerrList = [];
+                        setApplTerr([]);
+                    }
                 } else {
-                    const updatedTerrList = [{ label: 'Select...', value: '', terr_name: '', terr_code: '' }];
+                    updatedTerrList = [{ label: 'Select...', value: '', terr_name: '', terr_code: '' }];
                     setApplTerr(updatedTerrList);
                 }
 
-                setSelectedDropdown((prev) => ({
-                    ...prev,
-                    Userterritory: 0,
-                }));
+                setSelectedDropdown((prev) => {
+                    let terrIdx = 0;
+                    if (selectTerrCode && updatedTerrList.length > 0) {
+                        const found = updatedTerrList.findIndex((t: any) => t.terr_code === selectTerrCode);
+                        terrIdx = found >= 0 ? found : 0;
+                    }
+                    return {
+                        ...prev,
+                        Userterritory: terrIdx,
+                    };
+                });
+                return updatedTerrList;
             } catch (error) {
                 setApplTerr([]);
+                return [];
             } finally {
                 setLoading(false);
             }
@@ -195,10 +375,11 @@ const EPCAList = () => {
             Cookies.remove('authToken');
             navigate('/login/cover-login');
         }
+        return [];
         //setLoading(false);
     };
 
-    const GetPcaStatusData = async (selectedStatus: any) => {
+    const GetPcaStatusData = async (selectedStatus: any, preferredLovCode?: string) => {
         //setLoading(true);
         const data: any = {
             app_id: '15',
@@ -227,53 +408,34 @@ const EPCAList = () => {
 
             setApproveStatus(updatedStatusList);
 
-            const currentUsersubStatusExists = updatedStatusList.some((item) => item.lov_code === selectedDropdown.UsersubStatus);
-            if (!currentUsersubStatusExists)
+            if (preferredLovCode != null && preferredLovCode !== '') {
+                const subIdx = updatedStatusList.findIndex((item: any) => item.lov_code === preferredLovCode);
                 setSelectedDropdown((prev) => ({
                     ...prev,
-                    UsersubStatus: 0,
+                    UsersubStatus: subIdx >= 0 ? subIdx : 0,
                 }));
+            } else {
+                const currentUsersubStatusExists = updatedStatusList.some(
+                    (item) => item.lov_code === selectedDropdown.UsersubStatus
+                );
+                if (!currentUsersubStatusExists)
+                    setSelectedDropdown((prev) => ({
+                        ...prev,
+                        UsersubStatus: 0,
+                    }));
+            }
+            return updatedStatusList;
         } catch (error) {
             setApproveStatus([]);
+            return [];
         } finally {
             setLoading(false);
         }
         //setLoading(false);
     };
 
-    const GetPcaListData = async () => {
-        setLoading(true);
-        const data: any = {
-            app_id: 15,
-            DepotCode: selectedDropdown.Userdepot != -1 ? depot[selectedDropdown.Userdepot].depot_code : '',
-            TerritoryCode: selectedDropdown.Userterritory != -1 ? applTerr[selectedDropdown.Userterritory].terr_code : '',
-            BillToCode: pcaParam.billTo != '' ? pcaParam.billTo : '',
-            AcctNo: pcaParam.acctNo != '' ? pcaParam.acctNo : '',
-            DealerName: pcaParam.customerName != '' ? pcaParam.customerName : '',
-            SblCode: pcaParam.sblcode != '' ? pcaParam.sblcode : '4',
-            ApprovedStatus: selectedDropdown.UsersubStatus != -1 ? approveStatus[selectedDropdown.UsersubStatus].lov_code : '',
-            MainStatus: selectedDropdown.Userstatus != -1 ? mainStatus[selectedDropdown.Userstatus].value : 'PENDING',
-        };
-        try {
-            const response: any = await Epca.GetPcaList(data);
-            if (response && response.data != null && response.data != undefined) setData(response.data.table);
-            else setData([]);
-        } catch (error) {
-            setData([]);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     useEffect(() => {
         GetApplicableDepot();
-        // GetPcaStatusData('PENDING').then(() => {
-        //     setSelectedDropdown((prev) => ({
-        //         ...prev,
-        //         UsersubStatus: -1,
-        //     }));
-        //     GetPcaListData();
-        // });
     }, []);
 
     const handleSearch = (e: any) => {
@@ -284,6 +446,7 @@ const EPCAList = () => {
 
     const AddNewPCA = () => {
         //setLoading(true);
+        saveFiltersSnapshot(selectedDropdown, depot, applTerr, approveStatus, pcaParam);
         setCustomerProfile(null);
         setValueInSessionStorage('epcaDtlListEntryType', 'New');
         navigate('/Protecton/ePCA/EPCADetails/');
@@ -360,7 +523,7 @@ const EPCAList = () => {
                 size: 50,
             },
         ],
-        []
+        [selectedCustomer]
     );
     const table = useMantineReactTable({
         columns,
