@@ -21,7 +21,11 @@ const CommonFilterComponent = ({ selectBoxData, filterData, setFilterData, handl
                     value={filterData?.depotCode ? selectBoxData?.depot.find((option: any) => option.value === filterData.depotCode) : null}
                     options={selectBoxData?.depot}
                     onChange={(event) => {
-                        handleSelectChange(event, 'depotCode');
+                        setFilterData({
+                            ...filterData,
+                            depotCode: event?.value ?? '',
+                            terrCode: '',
+                        });
                     }}
                 />
             </div>

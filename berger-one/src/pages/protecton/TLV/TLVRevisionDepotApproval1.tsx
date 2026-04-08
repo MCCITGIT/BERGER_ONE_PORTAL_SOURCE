@@ -1,4 +1,5 @@
-import { Fragment, useEffect, useMemo, useState, type ChangeEvent, type JSXElementConstructor, type Key, type ReactElement, type ReactNode, type ReactPortal } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type JSXElementConstructor, type Key, type ReactElement, type ReactNode, type ReactPortal } from "react";
+import { flushSync } from "react-dom";
 import * as Tlv from '../../../services/api/protectonEpca/TLVRevisionDepotApproval';
 import * as Epca from '../../../services/api/protectonEpca/EpcaList';
 import { UseAuthStore } from "../../../services/store/AuthStore";
@@ -50,6 +51,9 @@ interface TlvLogInit {
     td_submission_type: any;
 }
 
+/** Match route in App.tsx; TLV details “back” navigates here when opened from depot approval. */
+const TLV_DETAILS_RETURN_DEPOT_APPROVAL = '/Protecton/TLV/TLVRevisionDepotApproval';
+
 const TlvLogDto: TlvLogInit = {
     depot_regn: '',
     depot_code: '',
@@ -69,6 +73,19 @@ const TlvLogDto: TlvLogInit = {
     td_submission_type: '',
 };
 
+type StoredTlvApprovalListFilters = {
+    depotCode: string;
+    terrCode: string;
+    billToCode: string;
+    dealerCode: string;
+    dealerName: string;
+    mainStatus: string;
+    aprvStatus: string;
+};
+
+let tlvDepotApprovalFiltersCache: StoredTlvApprovalListFilters | null = null;
+const TLV_DEPOT_APPROVAL_RETURN_FROM_DETAILS_KEY = 'tlvDepotApprovalReturnFromDetails';
+
 const TLVRevisionDepotApproval1 = () => {
     const [loading, setLoading]: any = useState(false);
     const [dgData, setDgData]: any = useState([]);
@@ -86,33 +103,51 @@ const TLVRevisionDepotApproval1 = () => {
     const [tlvLogData, setTlvLogData] = useState<TlvLogInit[]>([TlvLogDto]);
     const [showTlvModal, setShowTlvModal] = useState(false);
 
+    const filterDataRef = useRef(filterData);
     useEffect(() => {
-        console.log('Filter Data Changed:', filterData);
-    }, [filterData])
-    useEffect(() => {
-        console.log('selectBoxData:', selectBoxData);
-    }, [selectBoxData])
-
+        filterDataRef.current = filterData;
+    }, [filterData]);
 
     const user = UseAuthStore((state: any) => state.userDetails);
 
-    const GetApplicableDepot = async () => {
+    const snapApprovalFilters = (fd: typeof filterData): StoredTlvApprovalListFilters => ({
+        depotCode: fd.depotCode ?? '',
+        terrCode: fd.terrCode ?? '',
+        billToCode: fd.billToCode ?? '',
+        dealerCode: fd.dealerCode ?? '',
+        dealerName: fd.dealerName ?? '',
+        mainStatus: fd.mainStatus ?? 'PENDING',
+        aprvStatus: fd.aprvStatus ?? '',
+    });
+
+    const saveApprovalFiltersToCache = (fd: typeof filterData) => {
+        try {
+            tlvDepotApprovalFiltersCache = snapApprovalFilters(fd);
+        } catch {
+            /* ignore */
+        }
+    };
+
+    const GetTlvDepotApprovalListData = async () => {
         setLoading(true);
+        const filterData = filterDataRef.current;
         const data: any = {
-            user_id: user.user_id,
-            region: '',
-            app_id: '15',
+            depotCode: filterData?.depotCode,
+            terrCode: filterData?.terrCode,
+            billToCode: filterData?.billToCode,
+            dealerCode: filterData?.dealerCode,
+            dealerName: filterData?.dealerName,
+            mainStatus: filterData?.mainStatus,
+            aprvStatus: filterData?.aprvStatus,
         };
         try {
-            const response: any = await Epca.GetApplicableDepotList(data);
-            const updatedDepotList = [
-                { label: 'Select...', value: '' },
-                ...response.data.map((item: any) => ({
-                    label: item.depot_name,
-                    value: item.depot_code
-                })),
-            ];
-            setSelectBoxData((prevState: any) => ({ ...prevState, depot: updatedDepotList }));
+            const response: any = await Tlv.GetTlvDepotApprovalList(data);
+            if (response.data) {
+                setDgData(response.data.table);
+            } else {
+                setDgData([]);
+            }
+            saveApprovalFiltersToCache(filterDataRef.current);
         } catch (error) {
             return;
         }
@@ -144,6 +179,7 @@ const TLVRevisionDepotApproval1 = () => {
 
     const GetPcaStatusData = async () => {
         setLoading(true);
+        const filterData = filterDataRef.current;
         const data: any = {
             status: filterData.mainStatus,
             type: 'Depot',
@@ -164,28 +200,60 @@ const TLVRevisionDepotApproval1 = () => {
         setLoading(false);
     };
 
-    const GetTlvDepotApprovalListData = async () => {
-        setLoading(true);
-        const data: any = {
-            depotCode: filterData?.depotCode,
-            terrCode: filterData?.terrCode,
-            billToCode: filterData?.billToCode,
-            dealerCode: filterData?.dealerCode,
-            dealerName: filterData?.dealerName,
-            mainStatus: filterData?.mainStatus,
-            aprvStatus: filterData?.aprvStatus,
-        };
-        try {
-            const response: any = await Tlv.GetTlvDepotApprovalList(data);
-            if (response.data) {
-                setDgData(response.data.table);
-            } else {
-                setDgData([]);
-            }
-        } catch (error) {
+    const tryRestoreDepotApprovalFilters = async (depotList: any[]): Promise<boolean> => {
+        const f = tlvDepotApprovalFiltersCache;
+        if (!f) return false;
+        if (f.depotCode && !depotList.some((d: any) => d.value === f.depotCode)) return false;
+        await GetApplicableTerritory(f.depotCode);
+        const restored = snapApprovalFilters(f);
+        filterDataRef.current = restored;
+        flushSync(() => setFilterData(restored));
+        await GetPcaStatusData();
+        await GetTlvDepotApprovalListData();
+        return true;
+    };
+
+    const loadDepotApprovalListInitialOrRestore = async (depotList: any[]) => {
+        const returnFromDetails = sessionStorage.getItem(TLV_DEPOT_APPROVAL_RETURN_FROM_DETAILS_KEY) === '1';
+        sessionStorage.removeItem(TLV_DEPOT_APPROVAL_RETURN_FROM_DETAILS_KEY);
+        if (!returnFromDetails) {
+            tlvDepotApprovalFiltersCache = null;
+            GetPcaStatusData().then(() => GetTlvDepotApprovalListData());
             return;
         }
-        setLoading(false);
+        const restored = await tryRestoreDepotApprovalFilters(depotList);
+        if (!restored) {
+            GetPcaStatusData().then(() => GetTlvDepotApprovalListData());
+        }
+    };
+
+    const GetApplicableDepot = async () => {
+        setLoading(true);
+        const data: any = {
+            user_id: user.user_id,
+            region: '',
+            app_id: '15',
+        };
+        let updatedDepotList: any[] = [];
+        try {
+            const response: any = await Epca.GetApplicableDepotList(data);
+            updatedDepotList = [
+                { label: 'Select...', value: '' },
+                ...response.data.map((item: any) => ({
+                    label: item.depot_name,
+                    value: item.depot_code
+                })),
+            ];
+            setSelectBoxData((prevState: any) => ({ ...prevState, depot: updatedDepotList }));
+        } catch (error) {
+            return;
+        } finally {
+            if (updatedDepotList.length > 0) {
+                void loadDepotApprovalListInitialOrRestore(updatedDepotList);
+            } else {
+                setLoading(false);
+            }
+        }
     };
 
     const handleSearch = () => { GetTlvDepotApprovalListData(); };
@@ -199,12 +267,17 @@ const TLVRevisionDepotApproval1 = () => {
         storage.setItem(key, JSON.stringify(value));
     };
 
-    const selectedCustomer = (Lead: any) => {
-        setCustomerProfile(Lead);
-        setValueInSessionStorage('epcaTLVDtlList', Lead);
-        setValueInSessionStorage('epcaTLVDtlEntryType', 'View');
-        navigate('/Protecton/TLV/TLVRevisionRequestDetails/');
-    };
+    const selectedCustomer = useCallback(
+        (Lead: any) => {
+            saveApprovalFiltersToCache(filterData);
+            sessionStorage.setItem('tlvDetailsReturnPath', TLV_DETAILS_RETURN_DEPOT_APPROVAL);
+            setCustomerProfile(Lead);
+            setValueInSessionStorage('epcaTLVDtlList', Lead);
+            setValueInSessionStorage('epcaTLVDtlEntryType', 'View');
+            navigate('/Protecton/TLV/TLVRevisionRequestDetails/');
+        },
+        [filterData, setCustomerProfile, navigate]
+    );
 
     async function TlvApprove(data: { depot_regn?: string; depot_name?: string; dlr_terr_code?: string; dlr_dealer_code?: string; dlr_dealer_name?: string; current_tlv?: number; td_proposed_tlv: any; credit_days?: number; td_proposed_cr_days: any; status_value?: string; td_auto_id?: number; td_remarks: any; auto_id: any; file_doc?: string; approved_type?: any; }) {
         setLoading(true);
@@ -407,7 +480,7 @@ const TLVRevisionDepotApproval1 = () => {
                 },
             },
         ],
-        []
+        [selectedCustomer]
     );
 
     const table = useMantineReactTable({
@@ -492,12 +565,15 @@ const TLVRevisionDepotApproval1 = () => {
     };
 
     useEffect(() => {
-        filterData?.depotCode && GetApplicableTerritory(filterData?.depotCode);
+        setSelectBoxData((prevState: any) => ({
+            ...prevState,
+            terr: [{ label: 'Select...', value: '' }],
+        }));
+        void GetApplicableTerritory(filterData?.depotCode ?? '');
     }, [filterData?.depotCode]);
 
     useEffect(() => {
         GetApplicableDepot();
-        filterData?.mainStatus && filterData?.aprvStatus && GetTlvDepotApprovalListData();
     }, []);
 
     useEffect(() => {

@@ -30,9 +30,33 @@ const resolveProtectonDocumentUrl = (ref: string): string => {
     return `${PROTECTON_VIRTUAL_DOC_BASE}${s.replace(/^\/+/, '')}`;
 };
 
+const TLV_REVISION_REQUEST_LIST_PATH = '/Protecton/TLV/TLVRevisionRequestList/';
+const TLV_DETAILS_RETURN_PATH_KEY = 'tlvDetailsReturnPath';
+
 const TLVRevisionRequestDetails = () => {
     const user = UseAuthStore((state: any) => state.userDetails);
     const navigate = useNavigate();
+
+    /** Clears tlvDetailsReturnPath (set by the screen that opened details). Sets filter-restore flag for list / approval screens. */
+    const navigateBackToTlvOrigin = () => {
+        const path = sessionStorage.getItem(TLV_DETAILS_RETURN_PATH_KEY);
+        sessionStorage.removeItem(TLV_DETAILS_RETURN_PATH_KEY);
+        const target = path && path.length > 0 ? path : TLV_REVISION_REQUEST_LIST_PATH;
+        if (target.includes('TLVRevisionRequestList')) {
+            sessionStorage.setItem('tlvRevisionListReturnFromDetails', '1');
+        } else {
+            if (target.includes('TLVRevisionHoCommercialApproval')) {
+                sessionStorage.setItem('tlvHoCommercialApprovalReturnFromDetails', '1');
+            } else if (target.includes('TLVRevisionHoApproval')) {
+                sessionStorage.setItem('tlvHoApprovalReturnFromDetails', '1');
+            } else if (target.includes('TLVRevisionRSMApproval')) {
+                sessionStorage.setItem('tlvRsmApprovalReturnFromDetails', '1');
+            } else if (target.includes('TLVRevisionDepotApproval')) {
+                sessionStorage.setItem('tlvDepotApprovalReturnFromDetails', '1');
+            }
+        }
+        navigate(target);
+    };
 
     const [accordianOpen, setAccordianOpen] = useState<string>('');
     const [getTlvDetailsCalled, setGetTlvDetailsCalled] = useState<boolean>(false);
@@ -372,7 +396,7 @@ const TLVRevisionRequestDetails = () => {
                 if (response) {
                     if (response.statusCode == 200) {
                         commonSuccessToast(`TLV Revision Request ` + response.message);
-                        navigate('/Protecton/TLV/TLVRevisionRequestList/');
+                        navigateBackToTlvOrigin();
                     } else commonErrorToast(response.message);
                 } else commonErrorToast('Error occured while submitting TLV Revision!');
             } finally {
@@ -517,7 +541,7 @@ const TLVRevisionRequestDetails = () => {
 
     const handleBackButton = () => {
         commonAlert('Are you sure?', '', 'warning').then(async (result: any) => {
-            if (result.value) navigate('/Protecton/TLV/TLVRevisionRequestList/');
+            if (result.value) navigateBackToTlvOrigin();
         });
     };
 
@@ -1346,8 +1370,8 @@ const TLVRevisionRequestDetails = () => {
                     </div>
                     {/* {(!detailsData?.editable_yn) || (detailsData?.editable_yn && detailsData?.editable_yn !== 'N')  && */}
                     {/* {console.log("detailsData")} */}
-                    {detailsData?.editable_yn !== 'N' &&
-                        <div className="flex items-center justify-center gap-1 pb-3">
+                    <div className="flex items-center justify-center gap-1 pb-3">
+                        {detailsData?.editable_yn !== 'N' &&
                             <button
                                 type="button"
                                 disabled={submitLocked}
@@ -1359,18 +1383,18 @@ const TLVRevisionRequestDetails = () => {
                             >
                                 <IoMdSave /> &nbsp; {pageType === 'View' ? 'Update' : 'Submit'}
                             </button>
-                            <button
-                                type="button"
-                                disabled={submitLocked}
-                                className={`text-white px-4 py-2 rounded text-sm flex items-center ${submitLocked ? 'cursor-not-allowed bg-red-400 opacity-70' : 'bg-red-500 hover:bg-red-600'}`}
-                                onClick={() => {
-                                    handleBackButton();
-                                }}
-                            >
-                                <IoReturnUpBack />  &nbsp; Back
-                            </button>
-                        </div>
-                    }
+                        }
+                        <button
+                            type="button"
+                            disabled={submitLocked}
+                            className={`text-white px-4 py-2 rounded text-sm flex items-center ${submitLocked ? 'cursor-not-allowed bg-red-400 opacity-70' : 'bg-red-500 hover:bg-red-600'}`}
+                            onClick={() => {
+                                handleBackButton();
+                            }}
+                        >
+                            <IoReturnUpBack />  &nbsp; Back
+                        </button>
+                    </div>
                 </>
             }
 
