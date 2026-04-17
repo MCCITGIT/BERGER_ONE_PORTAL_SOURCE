@@ -3,6 +3,7 @@ import { ENDPOINTS } from './EndPoints';
 // import { RefreshTokenV1 } from '../services/api/login/loginSevice';
 import Cookies from 'js-cookie';
 import { RefreshTokenV1 } from '../services/login/loginSevice';
+import { GetProdDevRouteBuilder } from '../services/functions/getProdDevUrlBuilder';
 
 // import { deleteCookie } from 'cookies-next';
 
@@ -61,7 +62,7 @@ AXIOS_HTTP.interceptors.response.use(
                         Cookies.remove('authToken');
                         // window.location.href = process.env.SUB_DOMAIN_PATH + '/login/cover-login';
                         // _router.push('/login/cover-login');
-                        window.location.href = '/login/cover-login';
+                        window.location.href = GetProdDevRouteBuilder('/login/cover-login');
                     }
                 } catch (refreshError) {
                     localStorage.clear();
@@ -69,14 +70,14 @@ AXIOS_HTTP.interceptors.response.use(
                     localStorage.removeItem('_refresh_token');
                     // deleteCookie('authToken');
                     Cookies.remove('authToken');
-                    window.location.href = '/login/cover-login';
+                    window.location.href = GetProdDevRouteBuilder('/login/cover-login');
                     return Promise.reject(0);
                 }
             } else {
                 localStorage.clear();
                 // deleteCookie('authToken');
                 Cookies.remove('authToken');
-                window.location.href = '/login/cover-login';
+                window.location.href = GetProdDevRouteBuilder('/login/cover-login');
             }
         }
         return Promise.reject(error);
