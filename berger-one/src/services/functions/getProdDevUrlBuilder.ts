@@ -1,10 +1,8 @@
 export const GetProdDevRouteBuilder = (path: string) => {
     const normalized = path.startsWith('/') ? path : `/${path}`;
-    if (process.env.NODE_ENV === 'production') {
-        return (process.env.SUB_DOMAIN_PATH || '') + normalized;
-    }
-    const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
-    return `${base}${normalized}`;
+    const deployBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+    const origin = process.env.NODE_ENV === 'production' ? (process.env.SUB_DOMAIN_PATH || '') : '';
+    return `${origin}${deployBase}${normalized}`;
 };
 
 export const GetProdDevImgRouteBuilder = (path: string) => {
