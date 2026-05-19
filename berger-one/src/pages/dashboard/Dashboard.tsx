@@ -175,7 +175,7 @@ const Dashboard = () => {
             const response: any = await dashboard.GetDashboardLeadFunnelData({});
             setData((prevData: any) => ({
                 ...prevData,
-                dashboardLeadFunnelData: response.data.table[0] || [],
+                dashboardLeadFunnelData: response.data.table?.[0] || {},
             }));
 
         } catch (error) {
@@ -189,7 +189,7 @@ const Dashboard = () => {
             const response: any = await dashboard.GetDashboardSalesData({});
             setData((prevData: any) => ({
                 ...prevData,
-                dashboardSaleReviewData: response.data.table[0] || [],
+                dashboardSaleReviewData: response.data.table?.[0] || {},
                 dashboardOverduesData: response.data.table1 || [],
             }));
 
