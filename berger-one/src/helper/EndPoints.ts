@@ -112,6 +112,7 @@ const ALL_ENDPOINTS = {
     GetBillToDetails: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.Epca + 'GetBillToDetails',
     TlvDetailsSubmit: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.Epca + 'TlvDetailsSubmit',
     GetTlvDetails: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.Epca + 'GetTlvDetails',
+    PcaBulkDataUpload: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.Epca + 'PcaBulkDataUpload',
 
     GetLegalStatusList: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.common + 'GetLegalStatusList',
     GetLegalOutStandingApprovalList: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.Legal + 'GetLegalOutStandingApprovalList',
@@ -220,8 +221,10 @@ const ALL_ENDPOINTS = {
 };
 
 export const ENDPOINTS = {
-    BASE_URL_DEV: 'https://bpilmobile.bergerindia.com/ONE_PORTAL_API/api/',
-    BASE_URL_PROD: 'https://bpilmobile.bergerindia.com/ONE_PORTAL_API/api/',
+    // BASE_URL_DEV: 'https://bpilmobile.bergerindia.com/ONE_PORTAL_API/api/',
+    // BASE_URL_PROD: 'https://bpilmobile.bergerindia.com/ONE_PORTAL_API/api/',
+    BASE_URL_DEV: 'https://bpilmobileuat.bergerindia.com/ONE_PORTAL_API/api/',
+    BASE_URL_PROD: 'https://bpilmobileuat.bergerindia.com/ONE_PORTAL_API/api/',
 
     // BASE_URL_DEV: 'https://localhost:36554/api/',
     // BASE_URL_PROD: 'https://localhost:36554/api/',

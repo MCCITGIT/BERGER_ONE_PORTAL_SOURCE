@@ -19,7 +19,9 @@ const AXIOS_HTTP = axios.create({
 // api request interceptor
 AXIOS_HTTP.interceptors.request.use(
     (request) => {
-        request.headers.set('Content-Type', headerConfig['Content-Type']);
+        if (!(request.data instanceof FormData)) {
+            request.headers.set('Content-Type', headerConfig['Content-Type']);
+        }
         request.headers.set('Authorization', 'Bearer ' + localStorage.getItem('_token'));
         request.headers.set('Refresh-Token', localStorage.getItem('_refresh_token'));
         // request.headers.set('_token', headerConfig['_token']);
