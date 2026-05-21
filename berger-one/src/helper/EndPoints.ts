@@ -221,10 +221,10 @@ const ALL_ENDPOINTS = {
 };
 
 export const ENDPOINTS = {
-    // BASE_URL_DEV: 'https://bpilmobile.bergerindia.com/ONE_PORTAL_API/api/',
-    // BASE_URL_PROD: 'https://bpilmobile.bergerindia.com/ONE_PORTAL_API/api/',
-    BASE_URL_DEV: 'https://bpilmobileuat.bergerindia.com/ONE_PORTAL_API/api/',
-    BASE_URL_PROD: 'https://bpilmobileuat.bergerindia.com/ONE_PORTAL_API/api/',
+    BASE_URL_DEV: 'https://bpilmobile.bergerindia.com/ONE_PORTAL_API/api/',
+    BASE_URL_PROD: 'https://bpilmobile.bergerindia.com/ONE_PORTAL_API/api/',
+    // BASE_URL_DEV: 'https://bpilmobileuat.bergerindia.com/ONE_PORTAL_API/api/',
+    // BASE_URL_PROD: 'https://bpilmobileuat.bergerindia.com/ONE_PORTAL_API/api/',
 
     // BASE_URL_DEV: 'https://localhost:36554/api/',
     // BASE_URL_PROD: 'https://localhost:36554/api/',
