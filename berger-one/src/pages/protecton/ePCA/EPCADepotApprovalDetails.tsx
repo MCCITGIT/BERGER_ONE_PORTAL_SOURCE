@@ -331,7 +331,7 @@ const EPCADepotApprovalDetails = () => {
     const GetApplicableTerritory = async (depotCode: any) => {
         // setLoading(true);
         const data: any = {
-            user_id: 'murthy',
+            user_id: user.user_id,
             depot_code: depotCode,
             app_id: '15',
         };
