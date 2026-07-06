@@ -2,9 +2,12 @@ import { UseAuthStore } from '../../../../services/store/AuthStore';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Select from 'react-select';
 import * as RMA from '../../../../services/api/protectonRMA/RMAList';
+import * as Epca from '../../../../services/api/protectonEpca/EpcaList';
+import { CommonLovDetails, GetRegion } from '../../../../services/api/users/UserProfile';
 import { MantineReactTable, useMantineReactTable, type MRT_ColumnDef } from 'mantine-react-table';
 import { useNavigate } from 'react-router-dom';
 import { CiSearch } from 'react-icons/ci';
+import { FiEye } from 'react-icons/fi';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -25,7 +28,7 @@ const RETURN_KEY = 'rmaApprovalListReturnFromDetails';
 let rmaListFiltersCache: RMAFilter | null = null;
 
 const DEPOT_PLACEHOLDER = { depot_code: '', depot_name: 'Select...' };
-const REGION_PLACEHOLDER = { region_code: '', region_name: 'Select...' };
+const REGION_PLACEHOLDER = { depot_regn: '', regn_new: 'Select...' };
 
 const currentYear = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: 5 }, (_, i) => {
@@ -49,19 +52,7 @@ const MONTH_OPTIONS = [
     { value: '12', label: 'December' },
 ];
 
-const STATUS_OPTIONS = [
-    { value: '', label: 'Select...' },
-    { value: 'PENDING', label: 'Pending' },
-    { value: 'APPROVED', label: 'Approved' },
-    { value: 'REJECTED', label: 'Rejected' },
-];
-
-const RETURN_TYPE_OPTIONS = [
-    { value: '', label: 'Select...' },
-    { value: 'DAMAGE', label: 'Damage' },
-    { value: 'EXPIRY', label: 'Expiry' },
-    { value: 'OTHER', label: 'Other' },
-];
+const LOV_PLACEHOLDER = { value: '', label: 'Select...' };
 
 const defaultFilters = (): RMAFilter => ({
     year: String(currentYear),
@@ -69,7 +60,7 @@ const defaultFilters = (): RMAFilter => ({
     region_code: '',
     depot_code: '',
     depot_name: '',
-    status: 'PENDING',
+    status: '',
     return_type: '',
     dealer: '',
 });
@@ -85,6 +76,8 @@ const RMAapprovalList = () => {
     const [loading, setLoading] = useState(false);
     const [regions, setRegions] = useState<any[]>([{ ...REGION_PLACEHOLDER }]);
     const [depots, setDepots] = useState<any[]>([{ ...DEPOT_PLACEHOLDER }]);
+    const [statusOptions, setStatusOptions] = useState<{ value: string; label: string }[]>([LOV_PLACEHOLDER]);
+    const [returnTypeOptions, setReturnTypeOptions] = useState<{ value: string; label: string }[]>([LOV_PLACEHOLDER]);
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -99,8 +92,8 @@ const RMAapprovalList = () => {
 
     const loadRegions = async (): Promise<any[]> => {
         try {
-            const res: any = await RMA.GetRMAApplicableRegionList({ user_id: user.user_id, app_id: '15' });
-            const list = [{ ...REGION_PLACEHOLDER }, ...(res.data || [])];
+            const res: any = await GetRegion({ user_group: user.group_code, app_id: '15' });
+            const list = [{ ...REGION_PLACEHOLDER }, ...(res.data.table || [])];
             setRegions(list);
             return list;
         } catch {
@@ -109,14 +102,10 @@ const RMAapprovalList = () => {
         }
     };
 
-    const loadDepots = async (regionCode: string) => {
-        if (!regionCode) {
-            setDepots([{ ...DEPOT_PLACEHOLDER }]);
-            return;
-        }
+    const loadDepots = async (regionCode = '') => {
         setLoading(true);
         try {
-            const res: any = await RMA.GetRMAApplicableDepotList({
+            const res: any = await Epca.GetApplicableDepotList({
                 user_id: user.user_id,
                 region: regionCode,
                 app_id: '15',
@@ -129,18 +118,36 @@ const RMAapprovalList = () => {
         }
     };
 
+    const loadStatusOptions = async () => {
+        try {
+            const res: any = await CommonLovDetails({ lov_type: 'INVOICE_RETURN_SUB_STATUS_TYPE', active: 'Y' });
+            setStatusOptions([LOV_PLACEHOLDER, ...(res.data.table || []).map((d: any) => ({ value: d.lov_code, label: d.lov_value }))]);
+        } catch {
+            setStatusOptions([LOV_PLACEHOLDER]);
+        }
+    };
+
+    const loadReturnTypeOptions = async () => {
+        try {
+            const res: any = await CommonLovDetails({ lov_type: 'INVOICE_RETURN_TYPE', active: 'Y' });
+            setReturnTypeOptions([LOV_PLACEHOLDER, ...(res.data.table || []).map((d: any) => ({ value: d.lov_code, label: d.lov_value }))]);
+        } catch {
+            setReturnTypeOptions([LOV_PLACEHOLDER]);
+        }
+    };
+
     const fetchList = async (overrideFilters?: RMAFilter) => {
         const f = overrideFilters ?? filters;
         setLoading(true);
         try {
-            const res: any = await RMA.GetRMAApprovalList({
+            const res: any = await RMA.GetApprovalPendingReturnInvoiceList({
                 year: f.year,
                 month: f.month,
-                regionCode: f.region_code,
-                depotCode: f.depot_code,
+                region: f.region_code,
+                depot: f.depot_code,
                 status: f.status,
                 returnType: f.return_type,
-                dealer: f.dealer,
+                searchText: f.dealer,
             });
             setData(res?.data?.table ?? res?.data ?? []);
             saveFilters(f);
@@ -157,7 +164,7 @@ const RMAapprovalList = () => {
         const f = rmaListFiltersCache;
         if (!f) return false;
         if (f.region_code) {
-            const exists = regionList.some((r: any) => r.region_code === f.region_code);
+            const exists = regionList.some((r: any) => r.depot_regn === f.region_code);
             if (!exists) return false;
             await loadDepots(f.region_code);
         }
@@ -198,28 +205,25 @@ const RMAapprovalList = () => {
             {
                 accessorKey: 'region',
                 header: 'Region',
-                size: 80,
+                size: 90,
             },
             {
-                accessorKey: 'depot_name',
+                accessorKey: 'depot',
                 header: 'Depot',
-                size: 120,
+                size: 130,
             },
             {
-                accessorKey: 'dealer_name',
+                accessorKey: 'dlr_name',
                 header: 'Dealer',
                 size: 160,
-                Cell: ({ cell }) => (
-                    <span
-                        className="text-blue-600 cursor-pointer"
-                        onClick={() => openRow(cell.row.original)}
-                    >
-                        {cell.row.original.dealer_name}
-                    </span>
-                ),
             },
             {
-                accessorKey: 'invoice_no',
+                accessorKey: 'dlr_code',
+                header: 'Dealer Code',
+                size: 90,
+            },
+            {
+                accessorKey: 'invoice_num',
                 header: 'Invoice No',
                 size: 100,
             },
@@ -229,9 +233,14 @@ const RMAapprovalList = () => {
                 size: 100,
             },
             {
-                accessorKey: 'status',
+                accessorKey: 'return_type1',
+                header: 'Return Type',
+                size: 110,
+            },
+            {
+                accessorKey: 'approval_status',
                 header: 'Status',
-                size: 80,
+                size: 90,
             },
             {
                 id: 'action',
@@ -240,12 +249,11 @@ const RMAapprovalList = () => {
                 enableSorting: false,
                 Cell: ({ cell }) => (
                     <div className="flex justify-center">
-                        <button
-                            className="bg-gradient-to-b from-green-500 to-green-700 text-white text-xs px-4 py-1 rounded-full hover:opacity-90"
+                        <FiEye
+                            className="text-blue-600 cursor-pointer hover:text-blue-800"
+                            size={17}
                             onClick={() => openRow(cell.row.original)}
-                        >
-                            View
-                        </button>
+                        />
                     </div>
                 ),
             },
@@ -270,7 +278,7 @@ const RMAapprovalList = () => {
     // ── Select options/values ─────────────────────────────────────────────────
 
     const regionSelectOptions = useMemo(
-        () => regions.map((r: any) => ({ value: r.region_code, label: r.region_name })),
+        () => regions.map((r: any) => ({ value: r.depot_regn, label: r.regn_new })),
         [regions]
     );
     const regionSelectValue =
@@ -292,17 +300,17 @@ const RMAapprovalList = () => {
         MONTH_OPTIONS.find((o) => o.value === filters.month) ?? MONTH_OPTIONS[0];
 
     const statusSelectValue =
-        STATUS_OPTIONS.find((o) => o.value === filters.status) ?? STATUS_OPTIONS[0];
+        statusOptions.find((o) => o.value === filters.status) ?? statusOptions[0] ?? LOV_PLACEHOLDER;
 
     const returnTypeSelectValue =
-        RETURN_TYPE_OPTIONS.find((o) => o.value === filters.return_type) ?? RETURN_TYPE_OPTIONS[0];
+        returnTypeOptions.find((o) => o.value === filters.return_type) ?? returnTypeOptions[0] ?? LOV_PLACEHOLDER;
 
     // ── Mount ─────────────────────────────────────────────────────────────────
 
     useEffect(() => {
         let cancelled = false;
         (async () => {
-            const regionList = await loadRegions();
+            const [regionList] = await Promise.all([loadRegions(), loadDepots(), loadStatusOptions(), loadReturnTypeOptions()]);
             if (cancelled) return;
             await initialLoad(regionList);
         })();
@@ -385,7 +393,7 @@ const RMAapprovalList = () => {
                             className="text-sm"
                             isSearchable={true}
                             value={statusSelectValue}
-                            options={STATUS_OPTIONS}
+                            options={statusOptions}
                             onChange={(e) => setFilter({ status: e?.value ?? '' })}
                         />
                     </div>
@@ -397,7 +405,7 @@ const RMAapprovalList = () => {
                             className="text-sm"
                             isSearchable={true}
                             value={returnTypeSelectValue}
-                            options={RETURN_TYPE_OPTIONS}
+                            options={returnTypeOptions}
                             onChange={(e) => setFilter({ return_type: e?.value ?? '' })}
                         />
                     </div>

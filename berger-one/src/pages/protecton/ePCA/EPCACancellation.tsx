@@ -9,6 +9,7 @@ import * as EpcaCancellation from '../../../services/api/protectonEpca/EpcaCance
 import * as Epca from '../../../services/api/protectonEpca/EpcaList';
 import { commonAlert } from '../../../services/functions/commonAlert';
 import { commonSuccessToast } from '../../../services/functions/commonToast';
+import { UseAuthStore } from '../../../services/store/AuthStore';
 
 export interface SELECTED_DROPDOWN {
     Userdepot: number;
@@ -58,6 +59,7 @@ const EPCACancellation = () => {
     const [selectedDropdown, setSelectedDropdown] = useState<SELECTED_DROPDOWN>(selectedDropdownInit);
     const [depot, setDepot] = useState<any>([]);
     const [applTerr, setApplTerr] = useState<any>([]);
+    const user = UseAuthStore((state: any) => state.userDetails);
     //----//
     const [paginationState, _] = useState({
         pageIndex: 0, // zero-based index
@@ -117,7 +119,7 @@ const EPCACancellation = () => {
     const GetApplicableDepot = async () => {
         setLoading(true);
         const data: any = {
-            user_id: 'murthy',
+            user_id: user.user_id,
             region: '',
             app_id: '15',
         };
@@ -144,7 +146,7 @@ const EPCACancellation = () => {
     const GetApplicableTerritory = async (depotCode: any) => {
         setLoading(true);
         const data: any = {
-            user_id: 'murthy',
+            user_id: user.user_id,
             depot_code: depotCode,
             app_id: '15',
         };

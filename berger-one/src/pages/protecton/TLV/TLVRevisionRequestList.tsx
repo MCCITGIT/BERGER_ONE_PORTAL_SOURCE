@@ -10,6 +10,7 @@ import { IoEyeSharp } from 'react-icons/io5';
 import { IoMdDownload } from 'react-icons/io';
 import { useNavigate } from 'react-router-dom';
 import { selectStyles } from '../../../styles/select-styles';
+import { UseAuthStore } from '../../../services/store/AuthStore';
 
 export interface SELECTED_DROPDOWN {
     Userdepot: number;
@@ -58,6 +59,7 @@ type PcaType = {
 };
 
 const TLVRevisionRequestList = () => {
+    const user = UseAuthStore((state: any) => state.userDetails);
     const { setCustomerProfile } = TlvModuleStore((state) => state);
     const navigate = useNavigate();
 
@@ -282,7 +284,7 @@ const TLVRevisionRequestList = () => {
     const GetApplicableDepot = async () => {
         setLoading(true);
         const data: any = {
-            user_id: 'murthy',
+            user_id: user.user_id,
             region: '',
             app_id: '15',
         };
@@ -314,7 +316,7 @@ const TLVRevisionRequestList = () => {
     const GetApplicableTerritory = async (depotCode: any, selectTerrCode?: string) => {
         setLoading(true);
         const data: any = {
-            user_id: 'murthy',
+            user_id: user.user_id,
             depot_code: depotCode,
             app_id: '15',
         };
