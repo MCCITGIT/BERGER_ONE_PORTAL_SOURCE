@@ -67,6 +67,8 @@ import NewDashboard from './pages/dashboard/NewDashboard';
 import BulkUpload from './pages/protecton/BulkUpload/BulkUpload';
 import RMAapprovalList from './pages/protecton/RMAapproval/List/RMAapprovalList';
 import RMAapprovalDetails from './pages/protecton/RMAapproval/Details/RMAapprovalDetails';
+import AIassistantListScreen from './pages/AIassistant/AIassistantListScreen';
+import AIassistantDetailsScreen from './pages/AIassistant/AIassistantDetailsScreen';
 // import KeyAccountDetails from './pages/protecton/Others/KeyAccountDetails';
 
 // Helper function to check authentication
@@ -340,6 +342,14 @@ function App() {
             path: '/Protecton/RMA/RMAApprovalDetails',
             element: <RMAapprovalDetails />,
           },
+          {
+            path: '/AIassistant/AIassistantListScreen',
+            element: <AIassistantListScreen />,
+          },
+          {
+            path: '/AIassistant/AIassistantDetailsScreen/:chatId',
+            element: <AIassistantDetailsScreen />,
+          },
         ],
       },
       {
@@ -429,6 +439,8 @@ function App() {
           <Route path="/Protecton/BulkUpload/BulkUpload" element={<BulkUpload />} />
           <Route path="/Protecton/RMA/RMAApprovalList" element={<RMAapprovalList />} />
           <Route path="/Protecton/RMA/RMAApprovalDetails" element={<RMAapprovalDetails />} />
+          <Route path="/AIassistant/AIassistantListScreen" element={<AIassistantListScreen />} />
+          <Route path="/AIassistant/AIassistantDetailsScreen/:chatId" element={<AIassistantDetailsScreen />} />
         </Route>
         <Route path="/login/cover-login/" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />

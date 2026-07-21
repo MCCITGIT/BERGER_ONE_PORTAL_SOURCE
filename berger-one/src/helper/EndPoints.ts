@@ -8,6 +8,7 @@ export const BASE_ENDPOINTS = {
     Epca: 'Epca/',
     Legal: 'Legal/',
     Report: 'Report/',
+    AI: 'AI/',
     ProtectonDsr: 'PROTECTON/DSR/',
     ProtectonUserTracking: 'PROTECTON/UserTracking/',
     ProtectonClientTracking: 'PROTECTON/ClientTrack/',
@@ -216,6 +217,9 @@ const ALL_ENDPOINTS = {
     GetCompetitorActivityReport: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.ProtectonReport + 'GetCompetitorActivityReport',
     GetComplaintsReport: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.ProtectonReport + 'GetComplaintsReport',
     GetAppUsageReport: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.ProtectonReport + 'GetAppUsageReport',
+
+    GetConversationList: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.AI + 'AIChat/GetConversationList',
+    GetConversationDetails: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.AI + 'AIChat/GetConversationDetails',
 
     //#endregion
 };
