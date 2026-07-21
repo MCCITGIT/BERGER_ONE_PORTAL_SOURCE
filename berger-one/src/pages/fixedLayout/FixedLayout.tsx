@@ -10,6 +10,18 @@ import { UseAuthStore } from '../../services/store/AuthStore';
 import { Outlet } from 'react-router-dom';
 declare const __APP_VERSION__: string;
 
+const MANUAL_MENU_ITEMS = [
+    {
+        form_id: -1,
+        form_name: 'AI Assistant',
+        form_link: '/AIassistant/AIassistantListScreen',
+        form_icon: '',
+        form_parent_id: 0,
+        form_seq: 9999,
+        children: [],
+    },
+];
+
 const FixedLayout = () => {
     const navigate = useNavigate();
 
@@ -199,7 +211,8 @@ const FixedLayout = () => {
 
                     {/* horizontal menu */}
                     <ul className="horizontal-menu border-t border-[#ebedf2] bg-white px-6 py-0 font-semibold text-black rtl:space-x-reverse dark:border-[#cacaca] dark:text-white-dark flex flex-wrap gap-4">
-                        {userApplicableMenu.map((item: any, index: number) => (
+                        {/* {userApplicableMenu.map((item: any, index: number) => ( */}
+                        {[...userApplicableMenu, ...MANUAL_MENU_ITEMS].map((item: any, index: number) => (
                             <li className="relative" key={index} ref={menuDropdownRef} >
                                 <div className="flex items-center cursor-pointer">
                                     {item.form_link === '#' ? (
