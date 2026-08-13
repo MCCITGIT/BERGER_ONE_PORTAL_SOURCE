@@ -3,12 +3,15 @@ import { GetProdDevImgRouteBuilder } from '../../services/functions/getProdDevUr
 import { IoMdMail } from "react-icons/io";
 import { RiLockPasswordFill } from "react-icons/ri";
 import { FaCheck } from "react-icons/fa6";
+import { IoEye, IoEyeOff } from "react-icons/io5";
 // import { ValidateLogin } from '../../services/api/login/loginSevice';
 import { commonErrorToast, commonSuccessToast } from '../../services/functions/commonToast';
 import { useNavigate } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import { UseAuthStore } from '../../services/store/AuthStore';
 import { ValidateLogin } from '../../services/login/loginSevice';
+import ForgotPasswordModal from './ForgotPasswordModal';
+import ForceChangePasswordModal from './ForceChangePasswordModal';
 // import { UseAuthStore } from '../../services/store/AuthStore';
 
 const Login = () => {
@@ -17,6 +20,10 @@ const Login = () => {
 
     const [loginData, setLoginData] = useState({ email: '', password: '' });
     const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showForgotPassword, setShowForgotPassword] = useState(false);
+    const [showForceChangePassword, setShowForceChangePassword] = useState(false);
+    const [forceChangeUser, setForceChangeUser] = useState({ userId: '', mobileNo: '' });
 
     const navigate = useNavigate();
 
@@ -27,6 +34,14 @@ const Login = () => {
         try {
             const response: any = await ValidateLogin(postObj);
             if (response && response.success && response.message && response.token) {
+                if (response.data?.pwd_reset_required_yn === 'Y') {
+                    setForceChangeUser({
+                        userId: response.data?.user_id || loginData.email,
+                        mobileNo: response.data?.mobile || '',
+                    });
+                    setShowForceChangePassword(true);
+                    return;
+                }
                 const user = { userDetails: response };
                 localStorage.setItem('_token', response.token);
                 localStorage.setItem('_refresh_token', response.refresh_token);
@@ -117,9 +132,9 @@ const Login = () => {
                                         <input
                                             id="password"
                                             name="password"
-                                            type="password"
+                                            type={showPassword ? 'text' : 'password'}
                                             required
-                                            className="appearance-none rounded-none relative block w-full px-3 py-2 pl-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                                            className="appearance-none rounded-none relative block w-full px-3 py-2 pl-10 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                                             placeholder="Enter Password"
                                             value={loginData.password}
                                             onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
@@ -127,8 +142,26 @@ const Login = () => {
                                         <span className="absolute start-4 top-1/2 -translate-y-1/2">
                                             <RiLockPasswordFill />
                                         </span>
+                                        <button
+                                            type="button"
+                                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                            className="absolute end-4 top-1/2 -translate-y-1/2 cursor-pointer text-white-dark hover:text-gray-700"
+                                            onClick={() => setShowPassword((prev) => !prev)}
+                                        >
+                                            {showPassword ? <IoEyeOff /> : <IoEye />}
+                                        </button>
                                     </div>
                                     {/* <div className="text-danger">{errors.password?.message}</div> */}
+                                </div>
+
+                                <div className="flex justify-end">
+                                    <button
+                                        type="button"
+                                        className="text-sm font-semibold text-primary hover:underline"
+                                        onClick={() => setShowForgotPassword(true)}
+                                    >
+                                        Forgot password ?
+                                    </button>
                                 </div>
 
                                 {/* Submit button with loader when loading is true */}
@@ -155,6 +188,13 @@ const Login = () => {
                     </div>
                 </div>
             </div>
+            <ForgotPasswordModal isOpen={showForgotPassword} onClose={() => setShowForgotPassword(false)} />
+            <ForceChangePasswordModal
+                isOpen={showForceChangePassword}
+                onClose={() => setShowForceChangePassword(false)}
+                userId={forceChangeUser.userId}
+                mobileNo={forceChangeUser.mobileNo}
+            />
         </div>
     );
 };
