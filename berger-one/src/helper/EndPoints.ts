@@ -34,6 +34,9 @@ const ALL_ENDPOINTS = {
     Login: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.login + 'LoginVr1',
     RefreshToken: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.login + 'RefreshToken',
     RefreshTokenV1: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.login + 'RefreshTokenV2',
+    UserValidationForPassword: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.login + 'UserValidationForPassword',
+    PasswordValidateOTP: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.login + 'PasswordValidateOTP',
+    ChangeUserPassword: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.login + 'ChangeUserPassword',
     // RefreshTokenV1: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.login + 'RefreshTokenV1',
 
     GetUserList: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.common + 'GetUserList',
