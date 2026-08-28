@@ -69,6 +69,8 @@ import RMAapprovalList from './pages/protecton/RMAapproval/List/RMAapprovalList'
 import RMAapprovalDetails from './pages/protecton/RMAapproval/Details/RMAapprovalDetails';
 import AIassistantListScreen from './pages/AIassistant/AIassistantListScreen';
 import AIassistantDetailsScreen from './pages/AIassistant/AIassistantDetailsScreen';
+import DealerCreationList from './pages/DealerCreation/dealerCreationList';
+import DealerCreationDetails from './pages/DealerCreation/dealerCreationDetails';
 // import KeyAccountDetails from './pages/protecton/Others/KeyAccountDetails';
 
 // Helper function to check authentication
@@ -350,6 +352,14 @@ function App() {
             path: '/AIassistant/AIassistantDetailsScreen/:chatId',
             element: <AIassistantDetailsScreen />,
           },
+          {
+            path: '/DealerCreation/dealerCreationList',
+            element: <DealerCreationList />,
+          },
+          {
+            path: '/DealerCreation/dealerCreationDetails',
+            element: <DealerCreationDetails />,
+          },
         ],
       },
       {
@@ -441,6 +451,8 @@ function App() {
           <Route path="/Protecton/RMA/RMAApprovalDetails" element={<RMAapprovalDetails />} />
           <Route path="/AIassistant/AIassistantListScreen" element={<AIassistantListScreen />} />
           <Route path="/AIassistant/AIassistantDetailsScreen/:chatId" element={<AIassistantDetailsScreen />} />
+          <Route path="/DealerCreation/dealerCreationList" element={<DealerCreationList />} />
+          <Route path="/DealerCreation/dealerCreationDetails" element={<DealerCreationDetails />} />
         </Route>
         <Route path="/login/cover-login/" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
