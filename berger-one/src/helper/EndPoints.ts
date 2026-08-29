@@ -224,17 +224,42 @@ const ALL_ENDPOINTS = {
     GetConversationList: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.AI + 'AIChat/GetConversationList',
     GetConversationDetails: BASE_ENDPOINTS.v1 + BASE_ENDPOINTS.AI + 'AIChat/GetConversationDetails',
 
+    GetDcBusinessChannel: BASE_ENDPOINTS.v1 + 'DealerCreation/GetBusinessChannel',
+    GetDcSubFunction: BASE_ENDPOINTS.v1 + 'DealerCreation/GetSubFunction',
+    GetDcLovDetails: BASE_ENDPOINTS.v1 + 'DealerCreation/GetLovDetails',
+    GetDcHoSalesList: BASE_ENDPOINTS.v1 + 'DealerCreation/GetHoSalesList',
+    GetDealerCreationDetails: BASE_ENDPOINTS.v1 + 'DealerCreation/GetDealerCreationDetails',
+    GetDcApprovalLog: BASE_ENDPOINTS.v1 + 'DealerCreation/GetApprovalLog',
+    GetDcCustomerType: BASE_ENDPOINTS.v1 + 'DealerCreation/GetCustomerType',
+    GetDcCustomerSubType: BASE_ENDPOINTS.v1 + 'DealerCreation/GetCustomerSubType',
+    GetDcCustomerClass: BASE_ENDPOINTS.v1 + 'DealerCreation/GetCustomerClass',
+    GetDcClubClass: BASE_ENDPOINTS.v1 + 'DealerCreation/GetClubClass',
+    GetDcLeadByDepot: BASE_ENDPOINTS.v1 + 'DealerCreation/GetLeadByDepot',
+    GetDcLeadDetailsById: BASE_ENDPOINTS.v1 + 'DealerCreation/GetLeadDetailsById',
+    GetDcStateName: BASE_ENDPOINTS.v1 + 'DealerCreation/GetStateName',
+    GetDcDistrict: BASE_ENDPOINTS.v1 + 'DealerCreation/GetDistrict',
+    GetDcPaymentTerms: BASE_ENDPOINTS.v1 + 'DealerCreation/GetPaymentTerms',
+    GetDcAddress1: BASE_ENDPOINTS.v1 + 'DealerCreation/GetAddress1',
+    GetDcDnSlab: BASE_ENDPOINTS.v1 + 'DealerCreation/GetDnSlab',
+    ValidateDcMotherAccount: BASE_ENDPOINTS.v1 + 'DealerCreation/ValidateMotherAccount',
+    ValidateDcMotherCodeGst: BASE_ENDPOINTS.v1 + 'DealerCreation/ValidateMotherCodeGst',
+    DcApprovalUpdate: BASE_ENDPOINTS.v1 + 'DealerCreation/ApprovalUpdate',
+    ValidateDcGst: BASE_ENDPOINTS.v1 + 'DealerCreation/ValidateGst',
+    GetDcDocumentDownloadUrl: BASE_ENDPOINTS.v1 + 'DealerCreation/GetDocumentDownloadUrl',
+    DcHoSalesApprovalUpdate: BASE_ENDPOINTS.v1 + 'DealerCreation/HoSalesApprovalUpdate',
+    DcBackToAdminUpdate: BASE_ENDPOINTS.v1 + 'DealerCreation/BackToAdminUpdate',
+
     //#endregion
 };
 
 export const ENDPOINTS = {
-    BASE_URL_DEV: 'https://bpilmobile.bergerindia.com/ONE_PORTAL_API/api/',
-    BASE_URL_PROD: 'https://bpilmobile.bergerindia.com/ONE_PORTAL_API/api/',
+    //BASE_URL_DEV: 'https://bpilmobile.bergerindia.com/ONE_PORTAL_API/api/',
+    //BASE_URL_PROD: 'https://bpilmobile.bergerindia.com/ONE_PORTAL_API/api/',
     // BASE_URL_DEV: 'https://bpilmobileuat.bergerindia.com/ONE_PORTAL_API/api/',
     // BASE_URL_PROD: 'https://bpilmobileuat.bergerindia.com/ONE_PORTAL_API/api/',
 
-    // BASE_URL_DEV: 'https://localhost:36554/api/',
-    // BASE_URL_PROD: 'https://localhost:36554/api/',
+     BASE_URL_DEV: 'https://localhost:36554/api/',
+     BASE_URL_PROD: 'https://localhost:36554/api/',
     ...ALL_ENDPOINTS,
 };
 
