@@ -53,6 +53,15 @@ type LegalDealerRow = {
 
 const SELECT_PLACEHOLDER: SelectOption = { value: '', label: 'Select' };
 
+const SELECT_MENU_PROPS = {
+    menuPortalTarget: typeof document !== 'undefined' ? document.body : undefined,
+    menuPosition: 'fixed' as const,
+    styles: {
+        menuPortal: (base: any) => ({ ...base, zIndex: 9999 }),
+        menu: (base: any) => ({ ...base, zIndex: 9999 }),
+    },
+};
+
 const defaultFilters = (): FilterState => ({
     region: '',
     depot: '',
@@ -472,7 +481,7 @@ const LegalCaseApprovalListScreen = () => {
                 <h5 className="text-lg font-semibold dark:text-white-light">Legal Case Approval</h5>
             </div>
 
-            <div className="mb-2 overflow-hidden rounded-lg border border-blue-200 bg-white">
+            <div className={`mb-2 rounded-lg border border-blue-200 bg-white ${filterOpen ? 'overflow-visible' : 'overflow-hidden'}`}>
                 <button
                     type="button"
                     className="flex w-full items-center justify-between bg-[#d9e8ff] px-4 py-2 text-sm font-semibold text-gray-700"
@@ -489,7 +498,11 @@ const LegalCaseApprovalListScreen = () => {
                         <path d="M19 9L12 15L5 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"></path>
                     </svg>
                 </button>
-                <AnimateHeight duration={300} height={filterOpen ? 'auto' : 0}>
+                <AnimateHeight
+                    duration={300}
+                    height={filterOpen ? 'auto' : 0}
+                    style={filterOpen ? { overflow: 'visible' } : undefined}
+                >
                     <div className="space-y-2 px-4 py-3">
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
                             <div>
@@ -497,6 +510,7 @@ const LegalCaseApprovalListScreen = () => {
                                 <Select
                                     className="text-sm"
                                     isSearchable={true}
+                                    {...SELECT_MENU_PROPS}
                                     value={optionValue(regionOptions, filters.region)}
                                     options={regionOptions}
                                     onChange={(event) => {
@@ -511,6 +525,7 @@ const LegalCaseApprovalListScreen = () => {
                                 <Select
                                     className="text-sm"
                                     isSearchable={true}
+                                    {...SELECT_MENU_PROPS}
                                     value={optionValue(depotOptions, filters.depot)}
                                     options={depotOptions}
                                     onChange={(event) => setFilter({ depot: event?.value ?? '' })}
@@ -521,6 +536,7 @@ const LegalCaseApprovalListScreen = () => {
                                 <Select
                                     className="text-sm"
                                     isSearchable={true}
+                                    {...SELECT_MENU_PROPS}
                                     value={optionValue(sblOptions, filters.sbl)}
                                     options={sblOptions}
                                     onChange={(event) => setFilter({ sbl: event?.value ?? '' })}
@@ -531,6 +547,7 @@ const LegalCaseApprovalListScreen = () => {
                                 <Select
                                     className="text-sm"
                                     isSearchable={true}
+                                    {...SELECT_MENU_PROPS}
                                     value={optionValue(monthOptions, filters.month)}
                                     options={monthOptions}
                                     onChange={(event) => setFilter({ month: event?.value ?? '' })}
@@ -541,6 +558,7 @@ const LegalCaseApprovalListScreen = () => {
                                 <Select
                                     className="text-sm"
                                     isSearchable={true}
+                                    {...SELECT_MENU_PROPS}
                                     value={optionValue(yearOptions, filters.year)}
                                     options={yearOptions}
                                     onChange={(event) => setFilter({ year: event?.value ?? '' })}
@@ -566,6 +584,7 @@ const LegalCaseApprovalListScreen = () => {
                                 <Select
                                     className="text-sm"
                                     isSearchable={true}
+                                    {...SELECT_MENU_PROPS}
                                     value={optionValue(statusOptions, filters.status_code)}
                                     options={statusOptions}
                                     onChange={(event) => setFilter({ status_code: event?.value ?? '' })}
@@ -576,6 +595,7 @@ const LegalCaseApprovalListScreen = () => {
                                 <Select
                                     className="text-sm"
                                     isSearchable={true}
+                                    {...SELECT_MENU_PROPS}
                                     value={optionValue(asmActionOptions, filters.notice_yn)}
                                     options={asmActionOptions}
                                     onChange={(event) => setFilter({ notice_yn: event?.value ?? '' })}
@@ -586,6 +606,7 @@ const LegalCaseApprovalListScreen = () => {
                                 <Select
                                     className="text-sm"
                                     isSearchable={true}
+                                    {...SELECT_MENU_PROPS}
                                     value={optionValue(hoActionOptions, filters.notice_yn_ho)}
                                     options={hoActionOptions}
                                     onChange={(event) => setFilter({ notice_yn_ho: event?.value ?? '' })}
@@ -658,6 +679,7 @@ const LegalCaseApprovalListScreen = () => {
                             <Select
                                 className="text-sm"
                                 isSearchable={false}
+                                {...SELECT_MENU_PROPS}
                                 value={optionValue(
                                     reviewHoOptions.length ? reviewHoOptions : [
                                         { value: 'Y', label: 'Yes' },
