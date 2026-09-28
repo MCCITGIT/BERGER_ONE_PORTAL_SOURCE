@@ -13,6 +13,10 @@ import CustomPopupComponent from '../protecton/Lead/Components/customPopupCompon
 import DsrTodReportPopup from './Components/DsrTodReportPopup';
 import { Link } from 'react-router-dom';
 import { FaArrowRight } from "react-icons/fa6";
+
+const getTable = (response: any, key: string = 'table') =>
+    response?.data?.[key] ?? response?.[key] ?? [];
+
 const Dashboard = () => {
     const [detailsAPIcall, setdetailsAPIcall] = React.useState(false);
     const [isDsrTodReportPopupOpen, setIsDsrTodReportPopupOpen] = useState(false);
@@ -161,7 +165,7 @@ const Dashboard = () => {
             const response: any = await GetVerticalWisBusinessLine(data);
             setDdlData((prevData: any) => ({
                 ...prevData,
-                verticalData: response.data.table || [],
+                verticalData: getTable(response),
             }));
 
         } catch (error) {
@@ -175,7 +179,7 @@ const Dashboard = () => {
             const response: any = await dashboard.GetDashboardLeadFunnelData({});
             setData((prevData: any) => ({
                 ...prevData,
-                dashboardLeadFunnelData: response.data.table?.[0] || {},
+                dashboardLeadFunnelData: getTable(response)[0] || {},
             }));
 
         } catch (error) {
@@ -189,8 +193,8 @@ const Dashboard = () => {
             const response: any = await dashboard.GetDashboardSalesData({});
             setData((prevData: any) => ({
                 ...prevData,
-                dashboardSaleReviewData: response.data.table?.[0] || {},
-                dashboardOverduesData: response.data.table1 || [],
+                dashboardSaleReviewData: getTable(response)[0] || {},
+                dashboardOverduesData: getTable(response, 'table1'),
             }));
 
         } catch (error) {
@@ -211,7 +215,7 @@ const Dashboard = () => {
             const response: any = await dashboard.GetMWAStatus(payload);
             setData((prevData: any) => ({
                 ...prevData,
-                dashboardMWAData: response.data || [],
+                dashboardMWAData: response?.data ?? {},
             }));
         } catch (error) {
             return;
@@ -225,7 +229,7 @@ const Dashboard = () => {
             const response: any = await dashboard.GetDashboardLeadData({});
             setData((prevData: any) => ({
                 ...prevData,
-                leadData: response.data || [],
+                leadData: response?.data ?? {},
             }));
         } catch (error) {
             return;
@@ -256,11 +260,11 @@ const Dashboard = () => {
             const response: any = await common.GetProtectonRegion(data);
             setData((prevData: any) => ({
                 ...prevData,
-                regionList: response.data.table || [],
+                regionList: getTable(response),
             }));
             setDdlData((prevData: any) => ({
                 ...prevData,
-                protecton_regionList: response.data.table || [],
+                protecton_regionList: getTable(response),
             }));
 
         } catch (error) {
@@ -282,7 +286,7 @@ const Dashboard = () => {
             const response: any = await common.GetProtectonApplicableDepot(payload);
             setDdlData((prevData: any) => ({
                 ...prevData,
-                depotList: response.data.table || []
+                depotList: getTable(response),
             }));
         } catch (error) {
             return;
@@ -303,7 +307,7 @@ const Dashboard = () => {
             const response: any = await common.GetProtectonApplicableTerr(payload);
             setDdlData((prevData: any) => ({
                 ...prevData,
-                terrList: response?.data?.table || []
+                terrList: getTable(response),
             }));
         } catch (error) {
             return;
@@ -317,69 +321,69 @@ const Dashboard = () => {
         try {
             const response: any = await common.CommonLovDetails(payload);
             if (payload.lov_type === "PT_ASSIGN_STATUS") {
-                commonLovDetailsData.current["assignStatusList"] = response.data.table || [];
+                commonLovDetailsData.current["assignStatusList"] = getTable(response) || [];
             }
             else if (payload.lov_type === "PT_WORK_IN_PROGRESS") {
-                commonLovDetailsData.current["workStatusList"] = response.data.table || [];
+                commonLovDetailsData.current["workStatusList"] = getTable(response) || [];
             }
             // -----------PROLINKS popup-----------
             else if (payload.lov_type === "PT_LEAD_CATEGORY") {
-                commonLovDetailsData.current["paint_admixture_List"] = response.data.table || [];
+                commonLovDetailsData.current["paint_admixture_List"] = getTable(response) || [];
             }
             else if (payload.lov_type === "LEAD_ACCOUNT_TYPE") {
-                commonLovDetailsData.current["ac_type_List"] = response.data.table || [];
+                commonLovDetailsData.current["ac_type_List"] = getTable(response) || [];
             }
             else if (payload.lov_type === "PT_GOVT_PVT") {
-                commonLovDetailsData.current["govt_pvt_List"] = response.data.table || [];
+                commonLovDetailsData.current["govt_pvt_List"] = getTable(response) || [];
             }
             else if (payload.lov_type === "PT_PAINTING") {
-                commonLovDetailsData.current["painting_List"] = response.data.table || [];
+                commonLovDetailsData.current["painting_List"] = getTable(response) || [];
             }
             else if (payload.lov_type === "PT_LEAD_SECTOR") {
-                commonLovDetailsData.current["lead_sector_List"] = response.data.table || [];
+                commonLovDetailsData.current["lead_sector_List"] = getTable(response) || [];
             }
             else if (payload.lov_type === "PT_LEAD_SUB_SECTOR") {
-                commonLovDetailsData.current["lead_sub_sector_List"] = response.data.table || [];
+                commonLovDetailsData.current["lead_sub_sector_List"] = getTable(response) || [];
             }
             else if (payload.lov_type === "LEAD_POTENTIAL") {
-                commonLovDetailsData.current["lead_potential_list"] = response.data.table || [];
+                commonLovDetailsData.current["lead_potential_list"] = getTable(response) || [];
             }
             else if (payload.lov_type === "KEY_APPL_CITY") {
-                commonLovDetailsData.current["key_appl_city_List"] = response.data.table || [];
+                commonLovDetailsData.current["key_appl_city_List"] = getTable(response) || [];
             }
             else if (payload.lov_type === "PT_KEY_LEAD_STAGE") {
-                commonLovDetailsData.current["key_lead_stage_List"] = response.data.table || [];
+                commonLovDetailsData.current["key_lead_stage_List"] = getTable(response) || [];
             }
             else if (payload.lov_type === "PT_KEY_PAINTING_START_TIME") {
-                commonLovDetailsData.current["key_painting_start_time_List"] = response.data.table || [];
+                commonLovDetailsData.current["key_painting_start_time_List"] = getTable(response) || [];
             }
             // -----------SELF popup-----------
             else if (payload.lov_type === "PT_BUSINESS_CONTACT") {
-                commonLovDetailsData.current["refer_from_List"] = response.data.table || [];
+                commonLovDetailsData.current["refer_from_List"] = getTable(response) || [];
             }
             else if (payload.lov_type === "PT_CONTRACTOR_TYPE") {
-                commonLovDetailsData.current["contractor_type_List"] = response.data.table || [];
+                commonLovDetailsData.current["contractor_type_List"] = getTable(response) || [];
             }
             else if (payload.lov_type === "PT_KEY_ACCOUNT_TYPE") {
-                commonLovDetailsData.current["key_account_type_List"] = response.data.table ? [{lov_code: '',lov_value: 'None'}, ...response.data.table] : [];
+                commonLovDetailsData.current["key_account_type_List"] = getTable(response) ? [{lov_code: '',lov_value: 'None'}, ...getTable(response)] : [];
             }
             else if (payload.lov_type === "PT_AREA_MOU") {
-                commonLovDetailsData.current["potential_area_uom_List"] = response.data.table || [];
+                commonLovDetailsData.current["potential_area_uom_List"] = getTable(response) || [];
             }
             else if (payload.lov_type === "PT_BUSINESS_TYPE") {
-                commonLovDetailsData.current["business_type_List"] = response.data.table || [];
+                commonLovDetailsData.current["business_type_List"] = getTable(response) || [];
             }
             else if (payload.lov_type === "PT_PRODUCT_CATEGORY") {
-                commonLovDetailsData.current["product_category_List"] = response.data.table || [];
+                commonLovDetailsData.current["product_category_List"] = getTable(response) || [];
             }
             else if (payload.lov_type === "PT_INDUSTRY_SEGMENT") {
-                commonLovDetailsData.current["industry_segment_List"] = response.data.table || [];
+                commonLovDetailsData.current["industry_segment_List"] = getTable(response) || [];
             }
             else if (payload.lov_type === "PT_LEAD_SHARE") {
-                commonLovDetailsData.current["lead_share_List"] = response.data.table || [];
+                commonLovDetailsData.current["lead_share_List"] = getTable(response) || [];
             }
             else if (payload.lov_type === "PT_DOC_TYPE") {
-                commonLovDetailsData.current["doc_type_List"] = response.data.table || [];
+                commonLovDetailsData.current["doc_type_List"] = getTable(response) || [];
             }
         } catch (error) {
             return;
@@ -400,7 +404,7 @@ const Dashboard = () => {
             const response: any = await dashboard.GetUserGroup(data);
             setData((prevData: any) => ({
                 ...prevData,
-                userGroupList: response.data.table || [],
+                userGroupList: getTable(response),
             }));
 
         } catch (error) {
@@ -421,7 +425,7 @@ const Dashboard = () => {
             const response: any = await dashboard.GetApplicableUserList(payload);
             setData((prevData: any) => ({
                 ...prevData,
-                applicableUserList: response.data.table || [],
+                applicableUserList: getTable(response),
             }));
 
         } catch (error) {
@@ -808,7 +812,7 @@ const Dashboard = () => {
                                     className="text-sm"
                                     isSearchable={true}
                                     options={[
-                                        ...data.regionList.map((d: any) => ({
+                                        ...(data.regionList || []).map((d: any) => ({
                                             value: d.depot_regn,
                                             label: d.regn_new,
                                         })),
@@ -829,7 +833,7 @@ const Dashboard = () => {
                                     className="text-sm"
                                     isSearchable={true}
                                     options={[
-                                        ...data.userGroupList.map((d: any) => ({
+                                        ...(data.userGroupList || []).map((d: any) => ({
                                             value: d.grp_user_group_code,
                                             label: d.grp_user_group_desc,
                                         })),
@@ -957,15 +961,15 @@ const Dashboard = () => {
                     </div>
 
                     <div className="col-span-2 p-2 flex flex-col justify-between items-center bg-gradient-to-r from-blue-800 to-blue-900 m-2 rounded-md text-white">
-                        <p className='font-semibold'>{data.leadData.table?.[0]?.lead_converted || 0}</p>
+                        <p className='font-semibold'>{data.leadData?.table?.[0]?.lead_converted || 0}</p>
                         <label>Converted</label>
                     </div>
                     <div className="col-span-2 p-2 flex flex-col justify-between items-center bg-gradient-to-r from-blue-800 to-blue-900 m-2 rounded-md text-white">
-                        <p className='font-semibold'>{data.leadData.table?.[0]?.lead_asigned || 0}</p>
+                        <p className='font-semibold'>{data.leadData?.table?.[0]?.lead_asigned || 0}</p>
                         <label>Assigned</label>
                     </div>
                     <div className="col-span-2 p-2 flex flex-col justify-between items-center bg-gradient-to-r from-blue-800 to-blue-900 m-2 rounded-md text-white">
-                        <p className='font-semibold'>{data.leadData.table?.[0]?.lead_convertion_ratio || 0}</p>
+                        <p className='font-semibold'>{data.leadData?.table?.[0]?.lead_convertion_ratio || 0}</p>
                         <label>Converted ratio</label>
                     </div>
                 </div>
@@ -974,33 +978,33 @@ const Dashboard = () => {
                     <div className="col-span-3 p-4">
                         <div className="flex justify-between items-center bg-gradient-to-r from-blue-800 to-blue-900 p-4 rounded-md text-white font-semibold">
                             <label>Lead Creation</label>
-                            <p>{data.leadData.table?.[0]?.lead_created || 0}</p>
+                            <p>{data.leadData?.table?.[0]?.lead_created || 0}</p>
                         </div>
 
                         <div className="rounded-md bg-gradient-to-r from-blue-50 to-blue-100 p-1 mt-2 font-semibold">
                             <div className="flex justify-between items-center p-1">
                                 <label>By Self</label>
-                                <p className="bg-blue-800 px-2 rounded-full text-white">{data.leadData.table1?.[0]?.lead_creation_self || 0}</p>
+                                <p className="bg-blue-800 px-2 rounded-full text-white">{data.leadData?.table1?.[0]?.lead_creation_self || 0}</p>
                             </div>
                             <div className="flex justify-between items-center p-1">
                                 <label>To Other Protecton</label>
-                                <p className="bg-blue-800 px-2 rounded-full text-white">{data.leadData.table1?.[0]?.lead_creation_opl || 0}</p>
+                                <p className="bg-blue-800 px-2 rounded-full text-white">{data.leadData?.table1?.[0]?.lead_creation_opl || 0}</p>
                             </div>
                             <div className="flex justify-between items-center p-1">
                                 <label>To GI</label>
-                                <p className="bg-blue-800 px-2 rounded-full text-white">{data.leadData.table1?.[0]?.lead_creation_gi || 0}</p>
+                                <p className="bg-blue-800 px-2 rounded-full text-white">{data.leadData?.table1?.[0]?.lead_creation_gi || 0}</p>
                             </div>
                             <div className="flex justify-between items-center p-1">
                                 <label>To AUTO</label>
-                                <p className="bg-blue-800 px-2 rounded-full text-white">{data.leadData.table1?.[0]?.lead_creation_auto || 0}</p>
+                                <p className="bg-blue-800 px-2 rounded-full text-white">{data.leadData?.table1?.[0]?.lead_creation_auto || 0}</p>
                             </div>
                             <div className="flex justify-between items-center p-1">
                                 <label>To PROLINKS</label>
-                                <p className="bg-blue-800 px-2 rounded-full text-white">{data.leadData.table1?.[0]?.lead_creation_prolinks || 0}</p>
+                                <p className="bg-blue-800 px-2 rounded-full text-white">{data.leadData?.table1?.[0]?.lead_creation_prolinks || 0}</p>
                             </div>
                             <div className="flex justify-between items-center p-1">
                                 <label>To POWDER</label>
-                                <p className="bg-blue-800 px-2 rounded-full text-white">{data.leadData.table1?.[0]?.lead_creation_powder || 0}</p>
+                                <p className="bg-blue-800 px-2 rounded-full text-white">{data.leadData?.table1?.[0]?.lead_creation_powder || 0}</p>
                             </div>
                         </div>
                     </div>
@@ -1014,23 +1018,23 @@ const Dashboard = () => {
                         <div className="rounded-md bg-gradient-to-r from-blue-50 to-blue-100 p-1 mt-2 font-semibold">
                             <div className="flex justify-between items-center p-1">
                                 <label>From GI</label>
-                                <p className="bg-blue-800 px-2 rounded-full text-white">{data.leadData.table2?.[0]?.lead_visited_gi || 0} / {data.leadData.table2?.[0]?.lead_asigned_gi || 0}</p>
+                                <p className="bg-blue-800 px-2 rounded-full text-white">{data.leadData?.table2?.[0]?.lead_visited_gi || 0} / {data.leadData?.table2?.[0]?.lead_asigned_gi || 0}</p>
                             </div>
                             <div className="flex justify-between items-center p-1">
                                 <label>From AUTO</label>
-                                <p className="bg-blue-800 px-2 rounded-full text-white">{data.leadData.table2?.[0]?.lead_visited_auto || 0} / {data.leadData.table2?.[0]?.lead_asigned_auto || 0}</p>
+                                <p className="bg-blue-800 px-2 rounded-full text-white">{data.leadData?.table2?.[0]?.lead_visited_auto || 0} / {data.leadData?.table2?.[0]?.lead_asigned_auto || 0}</p>
                             </div>
                             <div className="flex justify-between items-center p-1">
                                 <label>From PROLINKS</label>
-                                <p className="bg-blue-800 px-2 rounded-full text-white">{data.leadData.table2?.[0]?.lead_visited_prolinks || 0} / {data.leadData.table2?.[0]?.lead_asigned_prolinks || 0}</p>
+                                <p className="bg-blue-800 px-2 rounded-full text-white">{data.leadData?.table2?.[0]?.lead_visited_prolinks || 0} / {data.leadData?.table2?.[0]?.lead_asigned_prolinks || 0}</p>
                             </div>
                             <div className="flex justify-between items-center p-1">
                                 <label>From Protecton</label>
-                                <p className="bg-blue-800 px-2 rounded-full text-white">{data.leadData.table2?.[0]?.lead_visited_protecton || 0} / {data.leadData.table2?.[0]?.lead_asigned_protecton || 0}</p>
+                                <p className="bg-blue-800 px-2 rounded-full text-white">{data.leadData?.table2?.[0]?.lead_visited_protecton || 0} / {data.leadData?.table2?.[0]?.lead_asigned_protecton || 0}</p>
                             </div>
                             <div className="flex justify-between items-center p-1">
                                 <label>From POWDER</label>
-                                <p className="bg-blue-800 px-2 rounded-full text-white">{data.leadData.table2?.[0]?.lead_visited_powder || 0} / {data.leadData.table2?.[0]?.lead_asigned_powder || 0}</p>
+                                <p className="bg-blue-800 px-2 rounded-full text-white">{data.leadData?.table2?.[0]?.lead_visited_powder || 0} / {data.leadData?.table2?.[0]?.lead_asigned_powder || 0}</p>
                             </div>
                         </div>
                     </div>
@@ -1043,7 +1047,7 @@ const Dashboard = () => {
                                 onClick={() => handleCardClick('New Leads')}
                             >
                                 <h3 className="text-lg font-semibold mb-2 text-blue-900">New Lead Assigned</h3>
-                                <p className="text-3xl font-bold text-blue-800 mb-1">{data.leadData.table3?.length || 0}</p>
+                                <p className="text-3xl font-bold text-blue-800 mb-1">{data.leadData?.table3?.length || 0}</p>
                                 <span className="text-gray-500 text-sm">View all</span>
                             </div>
                             {/* Card 2 */}
@@ -1052,7 +1056,7 @@ const Dashboard = () => {
                                 onClick={() => handleCardClick('Lead Status Updates')}
                             >
                                 <h3 className="text-lg font-semibold mb-2 text-blue-900">Lead Status Update</h3>
-                                <p className="text-3xl font-bold text-blue-800 mb-1">{data.leadData.table4?.length || 0}</p>
+                                <p className="text-3xl font-bold text-blue-800 mb-1">{data.leadData?.table4?.length || 0}</p>
                                 <span className="text-gray-500 text-sm">View all</span>
                             </div>
                             {/* Card 3 */}
@@ -1061,7 +1065,7 @@ const Dashboard = () => {
                                 onClick={() => handleCardClick('Lead Due Date Intimations')}
                             >
                                 <h3 className="text-lg font-semibold mb-2 text-blue-900">Lead Working Due Date</h3>
-                                <p className="text-3xl font-bold text-blue-800 mb-1">{data.leadData.table5?.length || 0}</p>
+                                <p className="text-3xl font-bold text-blue-800 mb-1">{data.leadData?.table5?.length || 0}</p>
                                 <span className="text-gray-500 text-sm">View all</span>
                             </div>
                         </div>
@@ -1093,7 +1097,7 @@ const Dashboard = () => {
                     <h2 className="text-xl font-bold mb-4">{modalTitle}</h2>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {(modalTitle === 'New Leads' && data.leadData.table3?.length > 0) && data.leadData.table3.map((lead: any, idx: number) => (
+                        {(modalTitle === 'New Leads' && data.leadData?.table3?.length > 0) && data.leadData?.table3.map((lead: any, idx: number) => (
                             <div
                                 key={idx}
                                 className="bg-white rounded-2xl shadow-md p-5 pb-3 relative border border-gray-100 flex flex-col 
@@ -1120,7 +1124,7 @@ const Dashboard = () => {
                                 </p>
                             </div>
                         ))}
-                        {(modalTitle === 'Lead Status Updates' && data.leadData.table4?.length > 0) && data.leadData.table4.map((lead: any, idx: number) => (
+                        {(modalTitle === 'Lead Status Updates' && data.leadData?.table4?.length > 0) && data.leadData?.table4.map((lead: any, idx: number) => (
                             <div
                                 key={idx}
                                 className="bg-white rounded-2xl shadow-md p-5 pb-3 relative border border-gray-100 flex flex-col
@@ -1147,7 +1151,7 @@ const Dashboard = () => {
                                 </p>
                             </div>
                         ))}
-                        {(modalTitle === 'Lead Due Date Intimations' && data.leadData.table5?.length > 0) && data.leadData.table5.map((lead: any, idx: number) => (
+                        {(modalTitle === 'Lead Due Date Intimations' && data.leadData?.table5?.length > 0) && data.leadData?.table5.map((lead: any, idx: number) => (
                             <div
                                 key={idx}
                                 className="bg-white rounded-2xl shadow-md p-5 pb-3 relative border border-gray-100 flex flex-col
@@ -1175,9 +1179,9 @@ const Dashboard = () => {
                             </div>
                         ))}
                         {/* Show message if no data */}
-                        {((modalTitle === 'New Leads' && (!data.leadData.table3 || data.leadData.table3.length === 0)) ||
-                            (modalTitle === 'Lead Status Updates' && (!data.leadData.table4 || data.leadData.table4.length === 0)) ||
-                            (modalTitle === 'Lead Due Date Intimations' && (!data.leadData.table5 || data.leadData.table5.length === 0))) && (
+                        {((modalTitle === 'New Leads' && (!data.leadData?.table3 || data.leadData?.table3.length === 0)) ||
+                            (modalTitle === 'Lead Status Updates' && (!data.leadData?.table4 || data.leadData?.table4.length === 0)) ||
+                            (modalTitle === 'Lead Due Date Intimations' && (!data.leadData?.table5 || data.leadData?.table5.length === 0))) && (
                                 <div className="col-span-3 text-center text-gray-500 py-8">
                                     No data available.
                                 </div>

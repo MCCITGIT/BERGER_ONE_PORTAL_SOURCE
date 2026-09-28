@@ -71,6 +71,7 @@ import AIassistantListScreen from './pages/AIassistant/AIassistantListScreen';
 import AIassistantDetailsScreen from './pages/AIassistant/AIassistantDetailsScreen';
 import DealerCreationList from './pages/DealerCreation/dealerCreationList';
 import DealerCreationDetails from './pages/DealerCreation/dealerCreationDetails';
+import LegalCaseApprovalListScreen from './pages/legalCaseApproval/LegalCaseApprovalListScreen';
 // import KeyAccountDetails from './pages/protecton/Others/KeyAccountDetails';
 
 // Helper function to check authentication
@@ -360,6 +361,10 @@ function App() {
             path: '/DealerCreation/dealerCreationDetails',
             element: <DealerCreationDetails />,
           },
+          {
+            path: '/legalCaseApproval/legalCaseApprovalListScreen',
+            element: <LegalCaseApprovalListScreen />,
+          },
         ],
       },
       {
@@ -453,6 +458,7 @@ function App() {
           <Route path="/AIassistant/AIassistantDetailsScreen/:chatId" element={<AIassistantDetailsScreen />} />
           <Route path="/DealerCreation/dealerCreationList" element={<DealerCreationList />} />
           <Route path="/DealerCreation/dealerCreationDetails" element={<DealerCreationDetails />} />
+          <Route path="/legalCaseApproval/legalCaseApprovalListScreen" element={<LegalCaseApprovalListScreen />} />
         </Route>
         <Route path="/login/cover-login/" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
