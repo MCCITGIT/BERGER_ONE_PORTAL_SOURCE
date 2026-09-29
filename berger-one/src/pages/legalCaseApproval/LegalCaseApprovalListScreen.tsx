@@ -19,8 +19,8 @@ type FilterState = {
     status_code: string;
     notice_yn: string;
     notice_yn_ho: string;
-    from_value: string;
-    to_value: string;
+    from_value: number | '';
+    to_value: number | '';
 };
 
 type LegalDealerRow = {
@@ -168,14 +168,14 @@ const LegalCaseApprovalListScreen = () => {
                 month: f.month || '',
                 region: f.region || '',
                 depot: f.depot || '',
-                dealer_code: dealer.dealer_code,
-                dealer_name: dealer.dealer_name,
+                dealerCode: dealer.dealer_code,
+                dealerName: dealer.dealer_name,
                 sbl: f.sbl || '',
-                notice_yn: f.notice_yn || '',
-                notice_yn_ho: f.notice_yn_ho || '',
-                from_value: f.from_value || '',
-                to_value: f.to_value || '',
-                status_code: f.status_code || '',
+                noticeYn: f.notice_yn || '',
+                noticeYnHo: f.notice_yn_ho || '',
+                fromValue: typeof f.from_value === 'number' ? f.from_value : 0,
+                toValue: typeof f.to_value === 'number' ? f.to_value : 0,
+                statusCode: f.status_code || '',
             });
             if (response?.success === false) {
                 setData([]);
@@ -619,22 +619,34 @@ const LegalCaseApprovalListScreen = () => {
                                 <label className="mb-1 block text-xs font-medium text-gray-600">Outstanding Amount:</label>
                                 <input
                                     type="number"
+                                    min={0}
+                                    step="any"
+                                    inputMode="decimal"
                                     autoComplete="off"
                                     placeholder="Min Amount (Rs.)"
                                     className="form-input w-full rounded border text-sm"
                                     value={filters.from_value}
-                                    onChange={(e) => setFilter({ from_value: e.target.value })}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        setFilter({ from_value: value === '' ? '' : Number(value) });
+                                    }}
                                 />
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="hidden text-xs text-gray-500 md:inline">to</span>
                                 <input
                                     type="number"
+                                    min={0}
+                                    step="any"
+                                    inputMode="decimal"
                                     autoComplete="off"
                                     placeholder="Max Amount (Rs.)"
                                     className="form-input w-full rounded border text-sm"
                                     value={filters.to_value}
-                                    onChange={(e) => setFilter({ to_value: e.target.value })}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        setFilter({ to_value: value === '' ? '' : Number(value) });
+                                    }}
                                 />
                             </div>
                             <div className="flex items-center gap-2 pb-0.5">
