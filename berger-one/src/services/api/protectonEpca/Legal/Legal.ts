@@ -18,14 +18,14 @@ export function GetODOSApprovalDealers<P, G>(data: {
     month: string;
     region: string;
     depot: string;
-    dealer_code: string;
-    dealer_name: string;
+    dealerCode: string;
+    dealerName: string;
     sbl: string;
-    notice_yn: string;
-    notice_yn_ho: string;
-    from_value: string;
-    to_value: string;
-    status_code: string;
+    noticeYn: string;
+    noticeYnHo: string;
+    fromValue: number;
+    toValue: number;
+    statusCode: string;
 }): Promise<G> {
     return HTTP_POST<P, G>(data, ENDPOINTS.GetODOSApprovalDealers) as Promise<G>;
 }
